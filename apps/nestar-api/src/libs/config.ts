@@ -51,6 +51,13 @@ export const availableRobotSorts = [
 	'lastSeenAt',
 ];
 
+export const availableRequestSorts = [
+	'createdAt',
+	'updatedAt',
+	'status',
+	'destinationDeskId',
+];
+
 export const availabeBoardArticleSorts = [
 	'createdAt',
 	'updatedAt',
