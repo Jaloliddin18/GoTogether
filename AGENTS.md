@@ -70,6 +70,43 @@ Add Smart Library features incrementally while preserving existing backend behav
 9. MQTT telemetry to MongoDB + WebSocket
 10. Staff dashboard operations
 
+## Migration Principle
+The goal is to transform the existing real-estate Nestar project into the 같이Go Smart Library Robot Delivery project.
+
+### 1) Keep useful infrastructure
+- NestJS/Next.js project structure
+- GraphQL/Apollo setup
+- MongoDB/Mongoose setup
+- Auth/JWT/roles
+- Layouts
+- Admin structure
+- Shared UI patterns
+- Styling system
+
+### 2) Replace domain-specific real-estate features
+- Property domain becomes Book/Catalog domain
+- Property detail becomes Book detail
+- Property search becomes Book search
+- Property admin becomes Book availability/admin
+- Agent pages may be removed or repurposed later
+- Real-estate homepage sections should later become Smart Library homepage sections
+
+### 3) Removal policy
+- Do not delete old real-estate modules/pages first.
+- First build a working Smart Library MVP.
+- Then update navigation/homepage to Smart Library.
+- Then remove old real-estate files only after checking imports and build.
+- Remove old files gradually, one domain area at a time.
+
+### 4) Codex rule for later real-estate removal
+When removing old real-estate code later, Codex must:
+- Search for imports/usages first
+- List files to delete
+- Explain risk
+- Ask for confirmation
+- Run build after deletion
+- Never delete large folders without confirmation
+
 ## Build and Test Expectations
 - Run `npm run build` when relevant.
 - Run `npm run test` when relevant.
