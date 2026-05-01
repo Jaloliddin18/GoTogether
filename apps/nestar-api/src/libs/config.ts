@@ -29,6 +29,17 @@ export const availablePropertySorts = [
 	'propertyPrice',
 ];
 
+export const availableBookSorts = [
+	'createdAt',
+	'updatedAt',
+	'title',
+	'author',
+	'isbn',
+	'callNumber',
+	'category',
+	'bookStatus',
+];
+
 export const availabeBoardArticleSorts = [
 	'createdAt',
 	'updatedAt',
