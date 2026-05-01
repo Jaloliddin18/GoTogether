@@ -40,6 +40,17 @@ export const availableBookSorts = [
 	'bookStatus',
 ];
 
+export const availableRobotSorts = [
+	'createdAt',
+	'updatedAt',
+	'robotId',
+	'name',
+	'status',
+	'battery',
+	'isOnline',
+	'lastSeenAt',
+];
+
 export const availabeBoardArticleSorts = [
 	'createdAt',
 	'updatedAt',
