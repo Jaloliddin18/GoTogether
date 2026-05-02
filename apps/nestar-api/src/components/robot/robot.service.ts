@@ -32,7 +32,9 @@ export class RobotService {
 			}
 			return await this.robotModel.create(payload);
 		} catch (err) {
-			console.log('Error, Service.model:', err.message);
+			// err can be unknown, ensure we safely access message
+			const message = err instanceof Error ? err.message : String(err);
+			console.log('Error, Service.model:', message);
 			throw new BadRequestException(Message.CREATE_FAILED);
 		}
 	}
