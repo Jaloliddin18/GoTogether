@@ -3,7 +3,6 @@ import type { ObjectId } from 'mongoose';
 import {
 	DeliveryDestinationType,
 	PaymentStatus,
-	RequestErrorCode,
 	RequestStatus,
 	RequestType,
 } from '../../enums/request.enum';
@@ -38,14 +37,14 @@ export class RequestTimelineItem {
 
 @ObjectType()
 export class RequestError {
-	@Field(() => RequestErrorCode)
-	code: RequestErrorCode;
+	@Field(() => String, { nullable: true })
+	code?: string;
 
 	@Field(() => String, { nullable: true })
 	message?: string;
 
-	@Field(() => Date)
-	timestamp: Date;
+	@Field(() => Date, { nullable: true })
+	timestamp?: Date;
 }
 
 @ObjectType('Request')
@@ -90,7 +89,7 @@ export class RequestTask {
 	timeline: RequestTimelineItem[];
 
 	@Field(() => RequestError, { nullable: true })
-	error?: RequestError;
+	error?: RequestError | null;
 
 	@Field(() => Date)
 	createdAt: Date;
