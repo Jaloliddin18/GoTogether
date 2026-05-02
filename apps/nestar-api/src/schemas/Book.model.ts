@@ -76,10 +76,12 @@ const BookSchema = new Schema(
 		},
 
 		bookPrice: {
-			amount: { type: Number },
-			currency: { type: String, default: 'KRW' },
-			discountPercent: { type: Number },
-			isDiscounted: { type: Boolean, default: false },
+			type: {
+				amount: { type: Number },
+				currency: { type: String, default: 'KRW' },
+				discountPercent: { type: Number },
+				isDiscounted: { type: Boolean, default: false },
+			},
 			required: true,
 		},
 
