@@ -22,14 +22,23 @@ After implementing a task, Codex should:
 6. Show the proposed commit message.
 7. Ask for confirmation before committing, unless my prompt explicitly says `commit after successful build`.
 
-Preferred commit format:
-- `Add backend book module`
-- `Add backend robot module`
-- `Add backend request lifecycle`
-- `Add frontend book search page`
-- `Add frontend tracking page`
-- `Fix frontend book search loading state`
-- `Update Smart Library docs`
+Commit message standard:
+- Use only `feat:` or `fix:` prefixes.
+- Do not use `docs:`, `refactor:`, `chore:`, `test:`, `style:`, or any other prefix.
+
+Use `feat:` for adding, removing, or changing planned project functionality.
+- `feat: add backend book module`
+- `feat: add backend robot module`
+- `feat: add backend request module`
+- `feat: add backend book inventory module`
+- `feat: remove backend agent role`
+- `feat: add frontend book search page`
+
+Use `fix:` for bug fixes, build errors, broken logic, DTO/schema mistakes, and incorrect fields.
+- `fix: resolve book dto build error`
+- `fix: correct request status logic`
+- `fix: restore backend build after enum change`
+- `fix: correct book inventory field names`
 
 ## If I explicitly request auto-commit
 
