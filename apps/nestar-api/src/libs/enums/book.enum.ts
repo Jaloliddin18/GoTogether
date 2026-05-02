@@ -1,11 +1,106 @@
 import { registerEnumType } from '@nestjs/graphql';
 
-export enum BookStatus {
-	AVAILABLE = 'AVAILABLE',
-	RESERVED = 'RESERVED',
-	IN_DELIVERY = 'IN_DELIVERY',
-	BORROWED = 'BORROWED',
-	MISSING = 'MISSING',
+export enum BookAudience {
+	CHILDREN = 'CHILDREN',
+	TEEN = 'TEEN',
+	GENERAL = 'GENERAL',
+	UNDERGRADUATE = 'UNDERGRADUATE',
+	GRADUATE = 'GRADUATE',
+	PROFESSIONAL = 'PROFESSIONAL',
 }
 
-registerEnumType(BookStatus, { name: 'BookStatus' });
+registerEnumType(BookAudience, {
+	name: 'BookAudience',
+});
+
+export enum BookFormat {
+	PAPERBACK = 'PAPERBACK',
+	EBOOK = 'EBOOK',
+	AUDIOBOOK = 'AUDIOBOOK',
+}
+
+registerEnumType(BookFormat, {
+	name: 'BookFormat',
+});
+
+export enum BookType {
+	TEXTBOOK = 'TEXTBOOK',
+	REFERENCE = 'REFERENCE',
+	RESEARCH = 'RESEARCH',
+	NOVEL = 'NOVEL',
+	COMIC = 'COMIC',
+	MAGAZINE = 'MAGAZINE',
+	JOURNAL = 'JOURNAL',
+	WORKBOOK = 'WORKBOOK',
+	MANUAL = 'MANUAL',
+	DICTIONARY = 'DICTIONARY',
+	ENCYCLOPEDIA = 'ENCYCLOPEDIA',
+	OTHER = 'OTHER',
+}
+
+registerEnumType(BookType, {
+	name: 'BookType',
+});
+
+export enum BookCategory {
+	ROMANCE = 'ROMANCE',
+	SCIENCE_FICTION = 'SCIENCE_FICTION',
+	MYSTERY_THRILLER = 'MYSTERY_THRILLER',
+	SELF_IMPROVEMENT = 'SELF_IMPROVEMENT',
+	CHILDRENS_BOOKS = 'CHILDRENS_BOOKS',
+	COMICS = 'COMICS',
+	LITERATURE = 'LITERATURE',
+	ARTS_AND_PHOTOGRAPHY = 'ARTS_AND_PHOTOGRAPHY',
+	COOKBOOKS = 'COOKBOOKS',
+	HEALTH_FITNESS = 'HEALTH_FITNESS',
+	HUMOR_ENTERTAINMENT = 'HUMOR_ENTERTAINMENT',
+	MEDICAL_BOOKS = 'MEDICAL_BOOKS',
+	POLITICS_AND_SOCIAL_SCIENCES = 'POLITICS_AND_SOCIAL_SCIENCES',
+	SCIENCE_AND_MATH = 'SCIENCE_AND_MATH',
+	SPORTS_AND_OUTDOORS = 'SPORTS_AND_OUTDOORS',
+	TEST_PREPARATION = 'TEST_PREPARATION',
+	TRAVEL = 'TRAVEL',
+	TEXTBOOKS = 'TEXTBOOKS',
+	MAGAZINES = 'MAGAZINES',
+	LAW = 'LAW',
+	COMPUTER_SCIENCE = 'COMPUTER_SCIENCE',
+	ENGINEERING = 'ENGINEERING',
+	BUSINESS = 'BUSINESS',
+	DESIGN = 'DESIGN',
+	KOREAN_LANGUAGE = 'KOREAN_LANGUAGE',
+	TOPIK_PREPARATION = 'TOPIK_PREPARATION',
+
+	OTHER = 'OTHER',
+}
+
+registerEnumType(BookCategory, {
+	name: 'BookCategory',
+});
+
+export enum BookLanguage {
+	ENGLISH = 'ENGLISH',
+	KOREAN = 'KOREAN',
+	CHINESE = 'CHINESE',
+	SPANISH = 'SPANISH',
+	FRENCH = 'FRENCH',
+	GERMAN = 'GERMAN',
+	RUSSIAN = 'RUSSIAN',
+	ARABIC = 'ARABIC',
+	UZBEK = 'UZBEK',
+	OTHER = 'OTHER',
+}
+
+registerEnumType(BookLanguage, {
+	name: 'BookLanguage',
+});
+
+export enum BookStatus {
+	ACTIVE = 'ACTIVE',
+	HIDDEN = 'HIDDEN',
+	SOLD = 'SOLD',
+	DELETED = 'DELETED',
+}
+
+registerEnumType(BookStatus, {
+	name: 'BookStatus',
+});

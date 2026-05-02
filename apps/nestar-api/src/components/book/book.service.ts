@@ -22,7 +22,7 @@ export class BookService {
 		try {
 			return await this.bookModel.create(input);
 		} catch (err) {
-			console.log('Error, Service.model:', err.message);
+			console.log('Error, Service.model:', err instanceof Error ? err.message : String(err));
 			throw new BadRequestException(Message.CREATE_FAILED);
 		}
 	}
