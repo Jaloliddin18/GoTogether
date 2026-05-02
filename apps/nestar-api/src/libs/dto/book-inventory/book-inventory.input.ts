@@ -116,6 +116,16 @@ export class CreateBookInventoryInput {
 	@Field(() => Int, { nullable: true })
 	bookSoldQuantity?: number;
 
+	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	bookReservedQuantity?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	bookBorrowedQuantity?: number;
+
 	@IsNotEmpty()
 	@Field(() => BookShelfInput)
 	bookShelf: BookShelfInput;
@@ -191,6 +201,26 @@ export class BookInventorySearchInput {
 	@Min(0)
 	@Field(() => Int, { nullable: true })
 	maxSoldQuantity?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	minReservedQuantity?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	maxReservedQuantity?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	minBorrowedQuantity?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	maxBorrowedQuantity?: number;
 }
 
 @InputType()

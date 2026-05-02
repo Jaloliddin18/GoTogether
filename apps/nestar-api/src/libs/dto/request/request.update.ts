@@ -1,6 +1,10 @@
 import { Field, InputType } from '@nestjs/graphql';
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
-import { RequestErrorCode, RequestStatus } from '../../enums/request.enum';
+import {
+	PaymentStatus,
+	RequestErrorCode,
+	RequestStatus,
+} from '../../enums/request.enum';
 
 @InputType()
 export class UpdateRequestStatusInput {
@@ -20,6 +24,10 @@ export class UpdateRequestStatusInput {
 	@IsOptional()
 	@Field(() => RequestErrorCode, { nullable: true })
 	errorCode?: RequestErrorCode;
+
+	@IsOptional()
+	@Field(() => PaymentStatus, { nullable: true })
+	paymentStatus?: PaymentStatus;
 }
 
 @InputType()

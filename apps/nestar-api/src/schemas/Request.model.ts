@@ -1,10 +1,25 @@
 import { Schema } from 'mongoose';
-import { RequestErrorCode, RequestStatus } from '../libs/enums/request.enum';
+import {
+	DeliveryDestinationType,
+	PaymentStatus,
+	RequestErrorCode,
+	RequestStatus,
+	RequestType,
+} from '../libs/enums/request.enum';
 
 const RequestSchema = new Schema(
 	{
 		bookId: {
 			type: Schema.Types.ObjectId,
+			required: true,
+		},
+		sourceInventoryId: {
+			type: Schema.Types.ObjectId,
+			required: true,
+		},
+		requestType: {
+			type: String,
+			enum: RequestType,
 			required: true,
 		},
 		robotId: {
@@ -18,6 +33,10 @@ const RequestSchema = new Schema(
 		},
 		destinationDeskId: {
 			type: String,
+		},
+		destinationType: {
+			type: String,
+			enum: DeliveryDestinationType,
 			required: true,
 		},
 		destination: {
@@ -30,6 +49,11 @@ const RequestSchema = new Schema(
 			type: String,
 			enum: RequestStatus,
 			default: RequestStatus.QUEUED,
+		},
+		paymentStatus: {
+			type: String,
+			enum: PaymentStatus,
+			default: PaymentStatus.NOT_REQUIRED,
 		},
 		timeline: [
 			{
@@ -56,5 +80,9 @@ RequestSchema.index({ memberId: 1, createdAt: -1 });
 RequestSchema.index({ sessionId: 1, createdAt: -1 });
 RequestSchema.index({ robotId: 1, createdAt: -1 });
 RequestSchema.index({ bookId: 1, createdAt: -1 });
+RequestSchema.index({ requestType: 1, status: 1, createdAt: -1 });
+RequestSchema.index({ sourceInventoryId: 1, createdAt: -1 });
+RequestSchema.index({ paymentStatus: 1, createdAt: -1 });
+RequestSchema.index({ destinationType: 1, createdAt: -1 });
 
 export default RequestSchema;

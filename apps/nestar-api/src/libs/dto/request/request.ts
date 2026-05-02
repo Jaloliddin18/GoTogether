@@ -1,6 +1,12 @@
 import { Field, ObjectType } from '@nestjs/graphql';
 import type { ObjectId } from 'mongoose';
-import { RequestErrorCode, RequestStatus } from '../../enums/request.enum';
+import {
+	DeliveryDestinationType,
+	PaymentStatus,
+	RequestErrorCode,
+	RequestStatus,
+	RequestType,
+} from '../../enums/request.enum';
 import { TotalCounter } from '../member/member';
 
 @ObjectType()
@@ -50,6 +56,12 @@ export class RequestTask {
 	@Field(() => String)
 	bookId: ObjectId;
 
+	@Field(() => String)
+	sourceInventoryId: ObjectId;
+
+	@Field(() => RequestType)
+	requestType: RequestType;
+
 	@Field(() => String, { nullable: true })
 	robotId?: ObjectId;
 
@@ -59,14 +71,20 @@ export class RequestTask {
 	@Field(() => String, { nullable: true })
 	sessionId?: string;
 
-	@Field(() => String)
-	destinationDeskId: string;
+	@Field(() => String, { nullable: true })
+	destinationDeskId?: string;
+
+	@Field(() => DeliveryDestinationType)
+	destinationType: DeliveryDestinationType;
 
 	@Field(() => RequestDestination)
 	destination: RequestDestination;
 
 	@Field(() => RequestStatus)
 	status: RequestStatus;
+
+	@Field(() => PaymentStatus)
+	paymentStatus: PaymentStatus;
 
 	@Field(() => [RequestTimelineItem])
 	timeline: RequestTimelineItem[];

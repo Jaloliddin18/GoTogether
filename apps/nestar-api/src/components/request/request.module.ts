@@ -4,6 +4,7 @@ import { AuthModule } from '../auth/auth.module';
 import RequestSchema from '../../schemas/Request.model';
 import BookSchema from '../../schemas/Book.model';
 import RobotSchema from '../../schemas/Robot.model';
+import BookInventorySchema from '../../schemas/BookInventory.model';
 import { RequestResolver } from './request.resolver';
 import { RequestService } from './request.service';
 
@@ -11,6 +12,9 @@ import { RequestService } from './request.service';
 	imports: [
 		MongooseModule.forFeature([{ name: 'Request', schema: RequestSchema }]),
 		MongooseModule.forFeature([{ name: 'Book', schema: BookSchema }]),
+		MongooseModule.forFeature([
+			{ name: 'BookInventory', schema: BookInventorySchema },
+		]),
 		MongooseModule.forFeature([{ name: 'Robot', schema: RobotSchema }]),
 		AuthModule,
 	],

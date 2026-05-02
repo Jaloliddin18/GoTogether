@@ -6,16 +6,22 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, ObjectId } from 'mongoose';
-import { Direction, Message } from '../../libs/enums/common.enum';
 import { BookStatus } from '../../libs/enums/book.enum';
 import { RobotStatus } from '../../libs/enums/robot.enum';
 import { MemberType } from '../../libs/enums/member.enum';
 import {
+	DeliveryDestinationType,
+	PaymentStatus,
 	RequestErrorCode,
 	RequestStatus,
+	RequestType,
 } from '../../libs/enums/request.enum';
+import {
+	REQUEST_RECEPTION_DESTINATION,
+	shapeIntoMongoObjectId,
+} from '../../libs/config';
+import { Direction, Message } from '../../libs/enums/common.enum';
 import { T } from '../../libs/types/common';
-import { shapeIntoMongoObjectId } from '../../libs/config';
 import { Book } from '../../libs/dto/book/book';
 import { Robot } from '../../libs/dto/robot/robot';
 import { Member } from '../../libs/dto/member/member';
@@ -29,12 +35,19 @@ import {
 	CancelRequestInput,
 	UpdateRequestStatusInput,
 } from '../../libs/dto/request/request.update';
+import { BookInventory } from '../../libs/dto/book-inventory/book-inventory';
+import {
+	BookInventoryStatus,
+	BookInventoryType,
+} from '../../libs/enums/book-inventory.enum';
 
 @Injectable()
 export class RequestService {
 	constructor(
 		@InjectModel('Request') private readonly requestModel: Model<RequestTask>,
 		@InjectModel('Book') private readonly bookModel: Model<Book>,
+		@InjectModel('BookInventory')
+		private readonly bookInventoryModel: Model<BookInventory>,
 		@InjectModel('Robot') private readonly robotModel: Model<Robot>,
 	) {}
 
@@ -42,21 +55,51 @@ export class RequestService {
 		input: CreateDeliveryRequestInput,
 		memberId?: ObjectId,
 	): Promise<RequestTask> {
+		let reservedInventoryId: ObjectId | undefined;
+		let createdRequestId: ObjectId | undefined;
 		try {
 			if (!memberId && !input.sessionId) {
 				throw new BadRequestException(Message.BAD_REQUEST);
 			}
 
 			const bookId = shapeIntoMongoObjectId(input.bookId);
-			const book = await this.bookModel.findOne({ _id: bookId }).exec();
+			const book = await this.bookModel
+				.findOne({
+					_id: bookId,
+					deletedAt: null,
+					bookStatus: { $ne: BookStatus.DELETED },
+				})
+				.lean()
+				.exec();
 			if (!book) throw new BadRequestException(RequestErrorCode.BOOK_UNAVAILABLE);
-			if (!book.available || book.bookStatus !== BookStatus.AVAILABLE) {
+
+			if (input.requestType === RequestType.BORROW && !book.isBorrowable) {
+				throw new BadRequestException(RequestErrorCode.BOOK_UNAVAILABLE);
+			}
+			if (input.requestType === RequestType.PURCHASE && !book.isPurchasable) {
 				throw new BadRequestException(RequestErrorCode.BOOK_UNAVAILABLE);
 			}
 
-			if (!input.destinationDeskId || !input.destination?.floorId) {
+			if (
+				input.requestType === RequestType.BORROW &&
+				(!input.destinationDeskId || !input.destination?.floorId)
+			) {
 				throw new BadRequestException(RequestErrorCode.INVALID_DESTINATION);
 			}
+
+			const sourceInventoryId = input.sourceInventoryId
+				? shapeIntoMongoObjectId(input.sourceInventoryId)
+				: undefined;
+
+			const reservedInventory = await this.reserveInventory({
+				bookId,
+				requestType: input.requestType,
+				sourceInventoryId,
+			});
+			if (!reservedInventory) {
+				throw new BadRequestException(RequestErrorCode.BOOK_UNAVAILABLE);
+			}
+			reservedInventoryId = reservedInventory._id;
 
 			const robot = await this.robotModel
 				.findOne({
@@ -66,14 +109,27 @@ export class RequestService {
 				.sort({ updatedAt: 1 })
 				.exec();
 
+			const isBorrow = input.requestType === RequestType.BORROW;
 			const payload: T = {
 				bookId,
+				sourceInventoryId: reservedInventory._id,
+				requestType: input.requestType,
 				memberId: memberId ?? null,
 				sessionId: input.sessionId ?? null,
-				destinationDeskId: input.destinationDeskId,
-				destination: input.destination,
+				destinationDeskId: isBorrow ? input.destinationDeskId ?? null : null,
+				destinationType: isBorrow
+					? DeliveryDestinationType.STUDENT_DESK
+					: DeliveryDestinationType.RECEPTION,
+				destination: isBorrow
+					? input.destination
+					: REQUEST_RECEPTION_DESTINATION,
+				paymentStatus: isBorrow
+					? PaymentStatus.NOT_REQUIRED
+					: PaymentStatus.PAY_AT_RECEPTION,
 				status: robot ? RequestStatus.ASSIGNED : RequestStatus.QUEUED,
-				timeline: [this.buildTimelineItem(RequestStatus.QUEUED, 'Request created.')],
+				timeline: [
+					this.buildTimelineItem(RequestStatus.QUEUED, 'Request created.'),
+				],
 			};
 
 			if (robot) {
@@ -87,6 +143,7 @@ export class RequestService {
 			}
 
 			const created: RequestTask = await this.requestModel.create(payload);
+			createdRequestId = created._id;
 
 			if (robot) {
 				await this.robotModel
@@ -99,22 +156,15 @@ export class RequestService {
 						{ new: true },
 					)
 					.exec();
-
-				await this.bookModel
-					.findOneAndUpdate(
-						{ _id: bookId },
-						{
-							available: false,
-							bookStatus: BookStatus.RESERVED,
-						},
-						{ new: true },
-					)
-					.exec();
 			}
 
 			return created;
 		} catch (err) {
-			console.log('Error, Service.model:', err.message);
+			if (reservedInventoryId && !createdRequestId) {
+				await this.releaseInventoryReservation(reservedInventoryId);
+			}
+			const msg = err instanceof Error ? err.message : String(err);
+			console.log('Error, Service.model:', msg);
 			if (
 				err instanceof BadRequestException ||
 				err instanceof ForbiddenException ||
@@ -200,9 +250,17 @@ export class RequestService {
 		requestId: ObjectId,
 		input: UpdateRequestStatusInput,
 	): Promise<RequestTask> {
+		const target = await this.requestModel.findOne({ _id: requestId }).exec();
+		if (!target) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+		if (target.status === input.status) return target;
+
 		const update: T = {
 			status: input.status,
 		};
+
+		if (input.paymentStatus) {
+			update.paymentStatus = input.paymentStatus;
+		}
 
 		if (input.errorCode) {
 			update.error = {
@@ -210,6 +268,37 @@ export class RequestService {
 				message: input.message ?? '',
 				timestamp: new Date(),
 			};
+		}
+
+		if (input.status === RequestStatus.COMPLETED) {
+			await this.applyCompletionToInventory(target);
+			if (
+				target.requestType === RequestType.PURCHASE &&
+				!input.paymentStatus
+			) {
+				update.paymentStatus = PaymentStatus.PAID;
+			}
+		}
+
+		if (
+			input.status === RequestStatus.FAILED ||
+			input.status === RequestStatus.CANCELLED
+		) {
+			await this.releaseInventoryReservation(target.sourceInventoryId);
+			if (input.status === RequestStatus.CANCELLED && !input.paymentStatus) {
+				update.paymentStatus = PaymentStatus.CANCELLED;
+			}
+		}
+
+		if (
+			target.robotId &&
+			[
+				RequestStatus.COMPLETED,
+				RequestStatus.FAILED,
+				RequestStatus.CANCELLED,
+			].includes(input.status)
+		) {
+			await this.releaseRobot(target.robotId);
 		}
 
 		const result = await this.requestModel
@@ -238,6 +327,9 @@ export class RequestService {
 		if (target.status === RequestStatus.COMPLETED) {
 			throw new BadRequestException(Message.NOT_ALLOWED_REQUEST);
 		}
+		if (target.status === RequestStatus.CANCELLED) {
+			return target;
+		}
 
 		const isAdmin = authMember?.memberType === MemberType.ADMIN;
 		if (!isAdmin) {
@@ -259,6 +351,7 @@ export class RequestService {
 				{
 					$set: {
 						status: RequestStatus.CANCELLED,
+						paymentStatus: PaymentStatus.CANCELLED,
 						error: {
 							code: RequestErrorCode.USER_CANCELLED,
 							message: input.reason ?? 'Cancelled by user.',
@@ -277,30 +370,10 @@ export class RequestService {
 			.exec();
 		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
 
-		if (target.robotId) {
-			await this.robotModel
-				.findOneAndUpdate(
-					{ _id: target.robotId },
-					{
-						status: RobotStatus.IDLE,
-						currentRequestId: null,
-					},
-					{ new: true },
-				)
-				.exec();
-		}
+		await this.releaseInventoryReservation(target.sourceInventoryId);
 
-		if (target.bookId) {
-			await this.bookModel
-				.findOneAndUpdate(
-					{ _id: target.bookId },
-					{
-						available: true,
-						bookStatus: BookStatus.AVAILABLE,
-					},
-					{ new: true },
-				)
-				.exec();
+		if (target.robotId) {
+			await this.releaseRobot(target.robotId);
 		}
 
 		return result;
@@ -309,11 +382,26 @@ export class RequestService {
 	private shapeMatchQuery(match: T, input: RequestsInquiry): void {
 		if (!input.search || Object.keys(input.search).length === 0) return;
 
-		const { status, bookId, robotId, memberId, sessionId, destinationDeskId } =
-			input.search;
+		const {
+			status,
+			requestType,
+			destinationType,
+			paymentStatus,
+			bookId,
+			sourceInventoryId,
+			robotId,
+			memberId,
+			sessionId,
+			destinationDeskId,
+		} = input.search;
 
 		if (status) match.status = status;
+		if (requestType) match.requestType = requestType;
+		if (destinationType) match.destinationType = destinationType;
+		if (paymentStatus) match.paymentStatus = paymentStatus;
 		if (bookId) match.bookId = shapeIntoMongoObjectId(bookId);
+		if (sourceInventoryId)
+			match.sourceInventoryId = shapeIntoMongoObjectId(sourceInventoryId);
 		if (robotId) match.robotId = shapeIntoMongoObjectId(robotId);
 		if (memberId) match.memberId = shapeIntoMongoObjectId(memberId);
 		if (sessionId) match.sessionId = sessionId;
@@ -327,5 +415,156 @@ export class RequestService {
 			message: message ?? '',
 			timestamp: new Date(),
 		};
+	}
+
+	private async reserveInventory(input: {
+		bookId: ObjectId;
+		requestType: RequestType;
+		sourceInventoryId?: ObjectId;
+	}): Promise<BookInventory | null> {
+		const { bookId, requestType, sourceInventoryId } = input;
+		const expectedType =
+			requestType === RequestType.BORROW
+				? BookInventoryType.LIBRARY
+				: BookInventoryType.COMMERCIAL;
+
+		const filter: T = {
+			bookId,
+			bookInventoryType: expectedType,
+			bookInventoryStatus: BookInventoryStatus.AVAILABLE,
+			deletedAt: null,
+			$expr: {
+				$gt: [
+					{
+						$subtract: [
+							'$bookTotalQuantity',
+							{
+								$add: [
+									'$bookSoldQuantity',
+									'$bookReservedQuantity',
+									'$bookBorrowedQuantity',
+								],
+							},
+						],
+					},
+					0,
+				],
+			},
+		};
+		if (sourceInventoryId) filter._id = sourceInventoryId;
+
+		const result = await this.bookInventoryModel
+			.findOneAndUpdate(filter, { $inc: { bookReservedQuantity: 1 } }, { new: true })
+			.exec();
+		if (!result) return null;
+
+		await this.syncInventoryStatusByAvailability(result._id);
+		return result;
+	}
+
+	private async releaseInventoryReservation(
+		sourceInventoryId: ObjectId,
+	): Promise<void> {
+		const updated = await this.bookInventoryModel
+			.findOneAndUpdate(
+				{
+					_id: sourceInventoryId,
+					deletedAt: null,
+					bookReservedQuantity: { $gt: 0 },
+				},
+				{ $inc: { bookReservedQuantity: -1 } },
+				{ new: true },
+			)
+			.exec();
+
+		if (updated) {
+			await this.syncInventoryStatusByAvailability(updated._id);
+		}
+	}
+
+	private async applyCompletionToInventory(request: RequestTask): Promise<void> {
+		if (request.requestType === RequestType.BORROW) {
+			const updated = await this.bookInventoryModel
+				.findOneAndUpdate(
+					{
+						_id: request.sourceInventoryId,
+						deletedAt: null,
+						bookReservedQuantity: { $gt: 0 },
+					},
+					{ $inc: { bookReservedQuantity: -1, bookBorrowedQuantity: 1 } },
+					{ new: true },
+				)
+				.exec();
+			if (updated) {
+				await this.syncInventoryStatusByAvailability(updated._id);
+			}
+			return;
+		}
+
+		if (request.requestType === RequestType.PURCHASE) {
+			const updated = await this.bookInventoryModel
+				.findOneAndUpdate(
+					{
+						_id: request.sourceInventoryId,
+						deletedAt: null,
+						bookReservedQuantity: { $gt: 0 },
+					},
+					{ $inc: { bookReservedQuantity: -1, bookSoldQuantity: 1 } },
+					{ new: true },
+				)
+				.exec();
+			if (updated) {
+				await this.syncInventoryStatusByAvailability(updated._id);
+			}
+		}
+	}
+
+	private async syncInventoryStatusByAvailability(
+		sourceInventoryId: ObjectId,
+	): Promise<void> {
+		const inventory = await this.bookInventoryModel
+			.findOne({
+				_id: sourceInventoryId,
+				deletedAt: null,
+			})
+			.lean()
+			.exec();
+		if (!inventory) return;
+
+		const availableStock = this.calculateAvailableStock(inventory);
+		const nextStatus =
+			availableStock > 0
+				? BookInventoryStatus.AVAILABLE
+				: BookInventoryStatus.RESERVED;
+		if (inventory.bookInventoryStatus === nextStatus) return;
+
+		await this.bookInventoryModel
+			.findOneAndUpdate(
+				{ _id: sourceInventoryId },
+				{ bookInventoryStatus: nextStatus },
+				{ new: true },
+			)
+			.exec();
+	}
+
+	private calculateAvailableStock(inventory: Partial<BookInventory>): number {
+		const total = inventory.bookTotalQuantity ?? 0;
+		const sold = inventory.bookSoldQuantity ?? 0;
+		const reserved = inventory.bookReservedQuantity ?? 0;
+		const borrowed = inventory.bookBorrowedQuantity ?? 0;
+		return total - sold - reserved - borrowed;
+	}
+
+	private async releaseRobot(robotId: ObjectId): Promise<void> {
+		await this.robotModel
+			.findOneAndUpdate(
+				{ _id: robotId },
+				{
+					status: RobotStatus.IDLE,
+					currentRequestId: null,
+				},
+				{ new: true },
+			)
+			.exec();
 	}
 }

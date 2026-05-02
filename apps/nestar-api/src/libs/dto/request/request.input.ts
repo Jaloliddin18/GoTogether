@@ -1,5 +1,6 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
 import {
+	IsEnum,
 	IsIn,
 	IsNotEmpty,
 	IsNumber,
@@ -9,7 +10,12 @@ import {
 } from 'class-validator';
 import { availableRequestSorts } from '../../config';
 import { Direction } from '../../enums/common.enum';
-import { RequestStatus } from '../../enums/request.enum';
+import {
+	DeliveryDestinationType,
+	PaymentStatus,
+	RequestStatus,
+	RequestType,
+} from '../../enums/request.enum';
 
 @InputType()
 export class DestinationInput {
@@ -40,19 +46,28 @@ export class CreateDeliveryRequestInput {
 	@Field(() => String)
 	bookId: string;
 
+	@IsNotEmpty()
+	@IsEnum(RequestType)
+	@Field(() => RequestType)
+	requestType: RequestType;
+
 	@IsOptional()
 	@IsString()
 	@Field(() => String, { nullable: true })
 	sessionId?: string;
 
-	@IsNotEmpty()
-	@IsString()
-	@Field(() => String)
-	destinationDeskId: string;
+	@IsOptional()
+	@Field(() => String, { nullable: true })
+	sourceInventoryId?: string;
 
-	@IsNotEmpty()
-	@Field(() => DestinationInput)
-	destination: DestinationInput;
+	@IsOptional()
+	@IsString()
+	@Field(() => String, { nullable: true })
+	destinationDeskId?: string;
+
+	@IsOptional()
+	@Field(() => DestinationInput, { nullable: true })
+	destination?: DestinationInput;
 }
 
 @InputType()
@@ -62,8 +77,24 @@ export class RequestsSearchInput {
 	status?: RequestStatus;
 
 	@IsOptional()
+	@Field(() => RequestType, { nullable: true })
+	requestType?: RequestType;
+
+	@IsOptional()
+	@Field(() => DeliveryDestinationType, { nullable: true })
+	destinationType?: DeliveryDestinationType;
+
+	@IsOptional()
+	@Field(() => PaymentStatus, { nullable: true })
+	paymentStatus?: PaymentStatus;
+
+	@IsOptional()
 	@Field(() => String, { nullable: true })
 	bookId?: string;
+
+	@IsOptional()
+	@Field(() => String, { nullable: true })
+	sourceInventoryId?: string;
 
 	@IsOptional()
 	@Field(() => String, { nullable: true })

@@ -53,7 +53,17 @@ export const availableRequestSorts = [
 	'updatedAt',
 	'status',
 	'destinationDeskId',
+	'requestType',
+	'destinationType',
+	'paymentStatus',
 ];
+
+export const REQUEST_RECEPTION_DESTINATION = {
+	floorId: 'demo_floor',
+	x: 0.5,
+	y: 0.2,
+	theta: 3.14,
+};
 
 export const availabeBoardArticleSorts = [
 	'createdAt',

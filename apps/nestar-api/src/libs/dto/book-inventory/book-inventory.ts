@@ -78,6 +78,12 @@ export class BookInventory {
 	@Field(() => Int)
 	bookSoldQuantity: number;
 
+	@Field(() => Int)
+	bookReservedQuantity: number;
+
+	@Field(() => Int)
+	bookBorrowedQuantity: number;
+
 	@Field(() => BookShelf)
 	bookShelf: BookShelf;
 

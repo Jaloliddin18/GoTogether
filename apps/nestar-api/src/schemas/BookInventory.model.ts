@@ -45,6 +45,16 @@ const BookInventorySchema = new Schema(
 			default: 0,
 		},
 
+		bookReservedQuantity: {
+			type: Number,
+			default: 0,
+		},
+
+		bookBorrowedQuantity: {
+			type: Number,
+			default: 0,
+		},
+
 		bookShelf: {
 			section: {
 				type: String,

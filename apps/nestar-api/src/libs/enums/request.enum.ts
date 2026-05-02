@@ -1,5 +1,31 @@
 import { registerEnumType } from '@nestjs/graphql';
 
+export enum RequestType {
+	BORROW = 'BORROW',
+	PURCHASE = 'PURCHASE',
+}
+
+registerEnumType(RequestType, { name: 'RequestType' });
+
+export enum DeliveryDestinationType {
+	STUDENT_DESK = 'STUDENT_DESK',
+	RECEPTION = 'RECEPTION',
+}
+
+registerEnumType(DeliveryDestinationType, {
+	name: 'DeliveryDestinationType',
+});
+
+export enum PaymentStatus {
+	NOT_REQUIRED = 'NOT_REQUIRED',
+	PAY_AT_RECEPTION = 'PAY_AT_RECEPTION',
+	PAID = 'PAID',
+	CANCELLED = 'CANCELLED',
+	REFUNDED = 'REFUNDED',
+}
+
+registerEnumType(PaymentStatus, { name: 'PaymentStatus' });
+
 export enum RequestStatus {
 	QUEUED = 'QUEUED',
 	ASSIGNED = 'ASSIGNED',

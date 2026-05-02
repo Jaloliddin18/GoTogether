@@ -105,6 +105,16 @@ export class UpdateBookInventoryInput {
 	bookSoldQuantity?: number;
 
 	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	bookReservedQuantity?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	bookBorrowedQuantity?: number;
+
+	@IsOptional()
 	@Field(() => BookShelfUpdateInput, { nullable: true })
 	bookShelf?: BookShelfUpdateInput;
 
