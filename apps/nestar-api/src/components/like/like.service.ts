@@ -5,10 +5,9 @@ import { Like, MeLiked } from '../../libs/dto/like/like';
 import { LikeInput } from '../../libs/dto/like/like.input';
 import { T } from '../../libs/types/common';
 import { Message } from '../../libs/enums/common.enum';
-import { OrdinaryInquiry } from '../../libs/dto/property/property.input';
-import { Properties } from '../../libs/dto/property/property';
+import { OrdinaryInquiry } from '../../libs/dto/book/book.input';
+import { Books } from '../../libs/dto/book/book';
 import { LikeGroup } from '../../libs/enums/like.enum';
-import { lookupFavorite } from '../../libs/config';
 
 @Injectable()
 export class LikeService {
@@ -44,34 +43,31 @@ export class LikeService {
 			: [];
 	}
 
-	public async getFavoriteProperties(
+	public async getFavoriteBooks(
 		memberId: ObjectId,
 		input: OrdinaryInquiry,
-	): Promise<Properties> {
+	): Promise<Books> {
 		const { page, limit } = input;
-		const match: T = { likeGroup: LikeGroup.PROPERTY, memberId: memberId };
+		const match: T = { likeGroup: LikeGroup.BOOK, memberId: memberId };
 
 		const data: T = await this.likeModel
 			.aggregate([
 				{ $match: match },
 				{ $sort: { updatedAt: -1 } },
-				// all liked properties by user from the latest liked one by sort
 				{
 					$lookup: {
-						from: 'properties',
+						from: 'books',
 						localField: 'likeRefId',
 						foreignField: '_id',
-						as: 'favoriteProperty',
+						as: 'favoriteBook',
 					},
 				},
-				{ $unwind: '$favoriteProperty' },
+				{ $unwind: '$favoriteBook' },
 				{
 					$facet: {
 						list: [
 							{ $skip: (page - 1) * limit },
 							{ $limit: limit },
-							lookupFavorite,
-							{ $unwind: '$favoriteProperty.memberData' },
 						],
 						metaCounter: [{ $count: 'total' }],
 					},
@@ -80,9 +76,9 @@ export class LikeService {
 			.exec();
 
 		console.log('data:', data);
-		const result: Properties = { list: [], metaCounter: data[0].metaCounter };
+		const result: Books = { list: [], metaCounter: data[0].metaCounter };
 		console.log('result:', result);
-		result.list = data[0].list.map((ele) => ele.favoriteProperty);
+		result.list = data[0].list.map((ele) => ele.favoriteBook);
 		return result;
 	}
 }

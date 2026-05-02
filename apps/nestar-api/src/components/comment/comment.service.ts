@@ -6,7 +6,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, ObjectId } from 'mongoose';
 import { MemberService } from '../member/member.service';
-import { PropertyService } from '../property/property.service';
+import { BookService } from '../book/book.service';
 import { BoardArticleService } from '../board-article/board-article.service';
 import { Comment, Comments } from '../../libs/dto/comment/comment';
 import {
@@ -24,7 +24,7 @@ export class CommentService {
 	constructor(
 		@InjectModel('Comment') private readonly commentModel: Model<Comment>,
 		private readonly memberService: MemberService,
-		private readonly propertyService: PropertyService,
+		private readonly bookService: BookService,
 		private readonly boardArticleService: BoardArticleService,
 	) {}
 
@@ -44,10 +44,10 @@ export class CommentService {
 		}
 
 		switch (input.commentGroup) {
-			case CommentGroup.PROPERTY:
-				await this.propertyService.propertyStatsEditor({
+			case CommentGroup.BOOK:
+				await this.bookService.bookStatsEditor({
 					_id: input.commentRefId,
-					targetKey: 'propertyComments',
+					targetKey: 'bookComments',
 					modifier: 1,
 				});
 				break;

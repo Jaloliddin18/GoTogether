@@ -5,17 +5,17 @@ import CommentSchema from '../../schemas/Comment.model';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import { MemberModule } from '../member/member.module';
-import { PropertyModule } from '../property/property.module';
+import { BookModule } from '../book/book.module';
 import { BoardArticleModule } from '../board-article/board-article.module';
 
 @Module({
 	imports: [
 		MongooseModule.forFeature([{ name: 'Comment', schema: CommentSchema }]),
-		AuthModule,
-		MemberModule,
-		BoardArticleModule,
-		PropertyModule,
-	],
+			AuthModule,
+			MemberModule,
+			BoardArticleModule,
+			BookModule,
+		],
 	providers: [CommentService, CommentResolver],
 	exports: [CommentService],
 })

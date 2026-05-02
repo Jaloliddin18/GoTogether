@@ -4,10 +4,9 @@ import { Model, ObjectId } from 'mongoose';
 import { View } from '../../libs/dto/view/view';
 import { ViewInput } from '../../libs/dto/view/view.input';
 import { T } from '../../libs/types/common';
-import { OrdinaryInquiry } from '../../libs/dto/property/property.input';
-import { Properties } from '../../libs/dto/property/property';
+import { OrdinaryInquiry } from '../../libs/dto/book/book.input';
+import { Books } from '../../libs/dto/book/book';
 import { ViewGroup } from '../../libs/enums/view.enum';
-import { lookupVisit } from '../../libs/config';
 
 @Injectable()
 export class ViewService {
@@ -27,13 +26,13 @@ export class ViewService {
 		return await this.viewModel.findOne(search).exec();
 	}
 
-	public async getVisitedProperties(
+	public async getVisitedBooks(
 		memberId: ObjectId,
 		input: OrdinaryInquiry,
-	): Promise<Properties> {
+	): Promise<Books> {
 		const { page, limit } = input;
 		const match: T = {
-			viewGroup: ViewGroup.PROPERTY,
+			viewGroup: ViewGroup.BOOK,
 			memberId: memberId,
 		};
 
@@ -41,23 +40,20 @@ export class ViewService {
 			.aggregate([
 				{ $match: match },
 				{ $sort: { updatedAt: -1 } },
-				// all liked properties by user from the latest liked one by sort
 				{
 					$lookup: {
-						from: 'properties',
+						from: 'books',
 						localField: 'viewRefId',
 						foreignField: '_id',
-						as: 'visitedProperty',
+						as: 'visitedBook',
 					},
 				},
-				{ $unwind: '$visitedProperty' },
+				{ $unwind: '$visitedBook' },
 				{
 					$facet: {
 						list: [
 							{ $skip: (page - 1) * limit },
 							{ $limit: limit },
-							lookupVisit,
-							{ $unwind: '$visitedProperty.memberData' },
 						],
 						metaCounter: [{ $count: 'total' }],
 					},
@@ -66,9 +62,9 @@ export class ViewService {
 			.exec();
 
 		console.log('data:', data);
-		const result: Properties = { list: [], metaCounter: data[0].metaCounter };
+		const result: Books = { list: [], metaCounter: data[0].metaCounter };
 		console.log('result:', result);
-		result.list = data[0].list.map((ele) => ele.visitedProperty);
+		result.list = data[0].list.map((ele) => ele.visitedBook);
 		return result;
 	}
 }

@@ -5,42 +5,102 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, ObjectId } from 'mongoose';
-import { T } from '../../libs/types/common';
+import { StatisticModifier, T } from '../../libs/types/common';
 import { Direction, Message } from '../../libs/enums/common.enum';
 import { Book, Books } from '../../libs/dto/book/book';
 import {
 	AllBooksInquiry,
 	BooksInquiry,
 	CreateBookInput,
+	OrdinaryInquiry,
 } from '../../libs/dto/book/book.input';
-import {
-	UpdateBookAvailabilityInput,
-	UpdateBookInput,
-} from '../../libs/dto/book/book.update';
+import { UpdateBookInput } from '../../libs/dto/book/book.update';
+import { BookStatus } from '../../libs/enums/book.enum';
+import { ViewService } from '../view/view.service';
+import { ViewGroup } from '../../libs/enums/view.enum';
+import { LikeService } from '../like/like.service';
+import { LikeInput } from '../../libs/dto/like/like.input';
+import { LikeGroup } from '../../libs/enums/like.enum';
+import { lookupAuthMemberLiked } from '../../libs/config';
 
 @Injectable()
 export class BookService {
-	constructor(@InjectModel('Book') private readonly bookModel: Model<Book>) {}
+	constructor(
+		@InjectModel('Book') private readonly bookModel: Model<Book>,
+		private readonly viewService: ViewService,
+		private readonly likeService: LikeService,
+	) {}
 
 	public async createBook(input: CreateBookInput): Promise<Book> {
 		try {
-			return await this.bookModel.create(input);
-		} catch (err) {
-			console.log('Error, Service.model:', err instanceof Error ? err.message : String(err));
+			const result = await this.bookModel.create(input);
+			return result;
+		} catch (err: unknown) {
+			// err may be unknown; safely log a string representation
+			const msg = err instanceof Error ? err.message : String(err);
+			console.log('Error, Service.model:', msg);
 			throw new BadRequestException(Message.CREATE_FAILED);
 		}
 	}
 
-	public async getBookById(bookId: ObjectId): Promise<Book> {
+	public async getBook(memberId: ObjectId | null, bookId: ObjectId): Promise<Book> {
+		const search: T = {
+			_id: bookId,
+			deletedAt: null,
+			bookStatus: { $ne: BookStatus.DELETED },
+		};
+		const targetBook: Book = await this.bookModel.findOne(search).lean().exec();
+		if (!targetBook) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+
+		if (memberId) {
+			const viewInput = {
+				memberId: memberId,
+				viewRefId: bookId,
+				viewGroup: ViewGroup.BOOK,
+			};
+			const newView = await this.viewService.recordView(viewInput);
+			if (newView) {
+				await this.bookStatsEditor({
+					_id: bookId,
+					targetKey: 'bookViews',
+					modifier: 1,
+				});
+				targetBook.bookViews++;
+			}
+		}
+
+		return targetBook;
+	}
+
+	public async updateBook(
+		memberId: ObjectId | null,
+		input: UpdateBookInput,
+	): Promise<Book> {
+		let { bookStatus, deletedAt } = input;
+		const search: T = {
+			_id: input._id,
+			deletedAt: null,
+		};
+
+		if (bookStatus === BookStatus.DELETED) deletedAt = new Date();
+
 		const result: Book = await this.bookModel
-			.findOne({ _id: bookId, deletedAt: null })
+			.findOneAndUpdate(search, input, {
+				new: true,
+			})
 			.exec();
 		if (!result) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
 		return result;
 	}
 
-	public async getBooks(input: BooksInquiry): Promise<Books> {
-		const match: T = { deletedAt: null };
+	public async getBooks(
+		memberId: ObjectId | null,
+		input: BooksInquiry,
+	): Promise<Books> {
+		const match: T = {
+			deletedAt: null,
+			bookStatus: { $ne: BookStatus.DELETED },
+		};
 		const sort: T = {
 			[input?.sort ?? 'createdAt']: input?.direction ?? Direction.DESC,
 		};
@@ -55,6 +115,7 @@ export class BookService {
 						list: [
 							{ $skip: (input.page - 1) * input.limit },
 							{ $limit: input.limit },
+							lookupAuthMemberLiked(memberId),
 						],
 						metaCounter: [{ $count: 'total' }],
 					},
@@ -64,6 +125,49 @@ export class BookService {
 		if (!result.length)
 			throw new InternalServerErrorException(Message.NO_DATA_FOUND);
 		return result[0];
+	}
+
+	public async getFavoriteBooks(
+		memberId: ObjectId,
+		input: OrdinaryInquiry,
+	): Promise<Books> {
+		return await this.likeService.getFavoriteBooks(memberId, input);
+	}
+
+	public async getVisitedBooks(
+		memberId: ObjectId,
+		input: OrdinaryInquiry,
+	): Promise<Books> {
+		return await this.viewService.getVisitedBooks(memberId, input);
+	}
+
+	public async likeTargetBook(
+		memberId: ObjectId,
+		likeRefId: ObjectId,
+	): Promise<Book> {
+		const target: Book = await this.bookModel
+			.findOne({
+				_id: likeRefId,
+				deletedAt: null,
+				bookStatus: { $ne: BookStatus.DELETED },
+			})
+			.exec();
+		if (!target) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+
+		const input: LikeInput = {
+			memberId: memberId,
+			likeRefId: likeRefId,
+			likeGroup: LikeGroup.BOOK,
+		};
+		const modifier: number = await this.likeService.toggleLike(input);
+		const result = await this.bookStatsEditor({
+			_id: likeRefId,
+			targetKey: 'bookLikes',
+			modifier: modifier,
+		});
+		if (!result)
+			throw new InternalServerErrorException(Message.SOMETHING_WENT_WRONG);
+		return result;
 	}
 
 	public async getAllBooksByAdmin(input: AllBooksInquiry): Promise<Books> {
@@ -96,27 +200,18 @@ export class BookService {
 		return result[0];
 	}
 
-	public async updateBook(input: UpdateBookInput): Promise<Book> {
-		const result: Book = await this.bookModel
-			.findOneAndUpdate({ _id: input._id }, input, {
-				new: true,
-			})
-			.exec();
-		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
-		return result;
+	public async updateBookByAdmin(input: UpdateBookInput): Promise<Book> {
+		return await this.updateBook(null, input);
 	}
 
-	public async updateBookAvailability(
-		bookId: ObjectId,
-		input: UpdateBookAvailabilityInput,
-	): Promise<Book> {
-		const update: T = { available: input.available };
-		if (input.bookStatus) update.bookStatus = input.bookStatus;
-
+	public async removeBookByAdmin(bookId: ObjectId): Promise<Book> {
 		const result: Book = await this.bookModel
-			.findOneAndUpdate({ _id: bookId }, update, { new: true })
+			.findOneAndDelete({
+				_id: bookId,
+				bookStatus: BookStatus.DELETED,
+			})
 			.exec();
-		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
+		if (!result) throw new InternalServerErrorException(Message.REMOVE_FAILED);
 		return result;
 	}
 
@@ -172,8 +267,21 @@ export class BookService {
 			if (typeof maxPrice === 'number') match['bookPrice.amount'].$lte = maxPrice;
 		}
 
-		if (typeof minRating === 'number') {
-			match['bookRating.average'] = { $gte: minRating };
+			if (typeof minRating === 'number') {
+				match['bookRating.average'] = { $gte: minRating };
+			}
 		}
+
+	public async bookStatsEditor(input: StatisticModifier): Promise<Book> {
+		const { _id, targetKey, modifier } = input;
+		return await this.bookModel
+			.findOneAndUpdate(
+				{ _id },
+				{
+					$inc: { [targetKey]: modifier },
+				},
+				{ new: true },
+			)
+			.exec();
 	}
 }

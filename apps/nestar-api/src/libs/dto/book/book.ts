@@ -9,6 +9,7 @@ import {
 	BookType,
 } from '../../enums/book.enum';
 import { TotalCounter } from '../member/member';
+import { MeLiked } from '../like/like';
 
 @ObjectType()
 export class BookPrice {
@@ -131,6 +132,9 @@ export class Book {
 
 	@Field(() => Date)
 	updatedAt: Date;
+
+	@Field(() => [MeLiked], { nullable: true })
+	meLiked?: MeLiked[];
 }
 
 @ObjectType()
