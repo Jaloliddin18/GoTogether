@@ -178,39 +178,6 @@ export class PropertiesInquiry {
 }
 
 @InputType()
-class APISearch {
-	@IsOptional()
-	@Field(() => PropertyStatus, { nullable: true })
-	propertyStatus?: PropertyStatus;
-}
-
-@InputType()
-export class AgentPropertiesInquiry {
-	@IsNotEmpty()
-	@Min(1)
-	@Field(() => Int)
-	page: number;
-
-	@IsNotEmpty()
-	@Min(1)
-	@Field(() => Int)
-	limit: number;
-
-	@IsOptional()
-	@IsIn(availablePropertySorts)
-	@Field(() => String, { nullable: true })
-	sort?: string;
-
-	@IsOptional()
-	@Field(() => Direction, { nullable: true })
-	direction?: Direction;
-
-	@IsOptional()
-	@Field(() => APISearch, { nullable: true })
-	search?: APISearch;
-}
-
-@InputType()
 class ALPISearch {
 	@IsOptional()
 	@Field(() => PropertyStatus, { nullable: true })

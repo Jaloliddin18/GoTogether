@@ -1,7 +1,6 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { MemberService } from './member.service';
 import {
-	AgentsInquiry,
 	LoginInput,
 	MemberInput,
 	MembersInquiry,
@@ -51,7 +50,7 @@ export class MemberResolver {
 		console.log(memberNick);
 		return `Hi ${memberNick}`;
 	}
-	@Roles(MemberType.USER, MemberType.AGENT)
+	@Roles(MemberType.USER)
 	@UseGuards(RolesGuard)
 	@Query(() => String)
 	public async checkAuthRoles(
@@ -82,16 +81,6 @@ export class MemberResolver {
 		console.log('Query: getMember');
 		const targetId = shapeIntoMongoObjectId(input);
 		return await this.memberService.getMember(memberId, targetId);
-	}
-
-	@UseGuards(WithoutGuard)
-	@Query(() => Members)
-	public async getAgents(
-		@Args('input') input: AgentsInquiry,
-		@AuthMember('_id') memberId: ObjectId,
-	): Promise<Members> {
-		console.log('Query: getAgents');
-		return await this.memberService.getAgensts(memberId, input);
 	}
 
 	@UseGuards(AuthGuard)

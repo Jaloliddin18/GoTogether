@@ -4,14 +4,6 @@ import * as path from 'path';
 import { T } from './types/common';
 import { pipeline } from 'stream';
 
-export const availableAgentSorts = [
-	'createdAt',
-	'updatedAt',
-	'memberLikes',
-	'memberViews',
-	'memberRank',
-];
-
 export const availableMemberSort = [
 	'createdAt',
 	'updatedAt',

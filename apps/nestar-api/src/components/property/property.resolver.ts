@@ -3,7 +3,6 @@ import { PropertyService } from './property.service';
 import { UseGuards } from '@nestjs/common';
 import { Properties, Property } from '../../libs/dto/property/property';
 import {
-	AgentPropertiesInquiry,
 	AllPropertiesInquiry,
 	OrdinaryInquiry,
 	PropertiesInquiry,
@@ -22,7 +21,7 @@ import { AuthGuard } from '../auth/guards/auth.guard';
 @Resolver()
 export class PropertyResolver {
 	constructor(private readonly propertyService: PropertyService) {}
-	@Roles(MemberType.AGENT)
+	@Roles(MemberType.ADMIN)
 	@UseGuards(RolesGuard)
 	@Mutation(() => Property)
 	public async createProperty(
@@ -45,7 +44,7 @@ export class PropertyResolver {
 		return await this.propertyService.getProperty(memberId, propertyId);
 	}
 
-	@Roles(MemberType.AGENT)
+	@Roles(MemberType.ADMIN)
 	@UseGuards(RolesGuard)
 	@Mutation((returns) => Property)
 	public async updateProperty(
@@ -85,17 +84,6 @@ export class PropertyResolver {
 	): Promise<Properties> {
 		console.log('Query: getVisited');
 		return await this.propertyService.getVisited(memberId, input);
-	}
-
-	@Roles(MemberType.AGENT)
-	@UseGuards(RolesGuard)
-	@Query((returns) => Properties)
-	public async getAgentProperties(
-		@Args('input') input: AgentPropertiesInquiry,
-		@AuthMember('_id') memberId: ObjectId,
-	): Promise<Properties> {
-		console.log('Query: getAgentProperties');
-		return await this.propertyService.getAgentProperties(memberId, input);
 	}
 
 	@UseGuards(AuthGuard)
