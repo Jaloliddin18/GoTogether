@@ -121,9 +121,6 @@ export class Book {
 	@Field(() => BookStatus)
 	bookStatus: BookStatus;
 
-	@Field(() => Boolean, { nullable: true })
-	available?: boolean;
-
 	@Field(() => Date, { nullable: true })
 	deletedAt?: Date;
 
