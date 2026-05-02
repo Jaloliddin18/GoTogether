@@ -2,7 +2,11 @@ import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
 import { BookService } from './book.service';
 import { Book, Books } from '../../libs/dto/book/book';
-import { CreateBookInput, BooksInquiry } from '../../libs/dto/book/book.input';
+import {
+	AllBooksInquiry,
+	BooksInquiry,
+	CreateBookInput,
+} from '../../libs/dto/book/book.input';
 import {
 	UpdateBookAvailabilityInput,
 	UpdateBookInput,
@@ -32,6 +36,16 @@ export class BookResolver {
 	public async getBooks(@Args('input') input: BooksInquiry): Promise<Books> {
 		console.log('Query: getBooks');
 		return await this.bookService.getBooks(input);
+	}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Query(() => Books)
+	public async getAllBooksByAdmin(
+		@Args('input') input: AllBooksInquiry,
+	): Promise<Books> {
+		console.log('Query: getAllBooksByAdmin');
+		return await this.bookService.getAllBooksByAdmin(input);
 	}
 
 	@UseGuards(WithoutGuard)

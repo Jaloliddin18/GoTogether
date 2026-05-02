@@ -8,7 +8,11 @@ import { Model, ObjectId } from 'mongoose';
 import { T } from '../../libs/types/common';
 import { Direction, Message } from '../../libs/enums/common.enum';
 import { Book, Books } from '../../libs/dto/book/book';
-import { BooksInquiry, CreateBookInput } from '../../libs/dto/book/book.input';
+import {
+	AllBooksInquiry,
+	BooksInquiry,
+	CreateBookInput,
+} from '../../libs/dto/book/book.input';
 import {
 	UpdateBookAvailabilityInput,
 	UpdateBookInput,
@@ -62,6 +66,36 @@ export class BookService {
 		return result[0];
 	}
 
+	public async getAllBooksByAdmin(input: AllBooksInquiry): Promise<Books> {
+		const { bookStatus, bookCategoryList } = input.search ?? {};
+		const match: T = {};
+		const sort: T = {
+			[input?.sort ?? 'createdAt']: input?.direction ?? Direction.DESC,
+		};
+
+		if (bookStatus) match.bookStatus = bookStatus;
+		if (bookCategoryList?.length) match.bookCategory = { $in: bookCategoryList };
+
+		const result = await this.bookModel
+			.aggregate([
+				{ $match: match },
+				{ $sort: sort },
+				{
+					$facet: {
+						list: [
+							{ $skip: (input.page - 1) * input.limit },
+							{ $limit: input.limit },
+						],
+						metaCounter: [{ $count: 'total' }],
+					},
+				},
+			])
+			.exec();
+		if (!result.length)
+			throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+		return result[0];
+	}
+
 	public async updateBook(input: UpdateBookInput): Promise<Book> {
 		const result: Book = await this.bookModel
 			.findOneAndUpdate({ _id: input._id }, input, {
@@ -91,64 +125,55 @@ export class BookService {
 
 		const {
 			keyword,
-			title,
-			author,
-			isbn,
-			callNumber,
-			category,
-			subCategories,
+			bookTitle,
+			bookAuthor,
+			bookIsbn,
+			bookCallNumber,
+			bookCategory,
 			bookType,
-			audience,
-			format,
-			language,
+			bookAudience,
+			bookFormat,
+			bookLanguage,
 			bookStatus,
 			isBorrowable,
 			isPurchasable,
 			minPrice,
 			maxPrice,
 			minRating,
-			tags,
-			available,
 		} = input.search;
 
 		if (keyword) {
 			const regex = new RegExp(keyword, 'i');
 			match.$or = [
-				{ title: { $regex: regex } },
-				{ subtitle: { $regex: regex } },
-				{ author: { $regex: regex } },
-				{ authors: { $elemMatch: { $regex: regex } } },
-				{ isbn: { $regex: regex } },
-				{ callNumber: { $regex: regex } },
-				{ publisher: { $regex: regex } },
-				{ tags: { $elemMatch: { $regex: regex } } },
+				{ bookTitle: { $regex: regex } },
+				{ bookAuthor: { $regex: regex } },
+				{ bookIsbn: { $regex: regex } },
+				{ bookCallNumber: { $regex: regex } },
 			];
 		}
 
-		if (title) match.title = { $regex: new RegExp(title, 'i') };
-		if (author) match.author = { $regex: new RegExp(author, 'i') };
-		if (isbn) match.isbn = { $regex: new RegExp(isbn, 'i') };
-		if (callNumber) match.callNumber = { $regex: new RegExp(callNumber, 'i') };
-		if (category) match.category = category;
-		if (subCategories?.length) match.subCategories = { $in: subCategories };
+		if (bookTitle) match.bookTitle = { $regex: new RegExp(bookTitle, 'i') };
+		if (bookAuthor) match.bookAuthor = { $regex: new RegExp(bookAuthor, 'i') };
+		if (bookIsbn) match.bookIsbn = { $regex: new RegExp(bookIsbn, 'i') };
+		if (bookCallNumber)
+			match.bookCallNumber = { $regex: new RegExp(bookCallNumber, 'i') };
+		if (bookCategory) match.bookCategory = bookCategory;
 		if (bookType) match.bookType = bookType;
-		if (audience) match.audience = audience;
-		if (format) match.format = format;
-		if (language) match.language = language;
-		if (typeof available === 'boolean') match.available = available;
+		if (bookAudience) match.bookAudience = bookAudience;
+		if (bookFormat) match.bookFormat = bookFormat;
+		if (bookLanguage) match.bookLanguage = bookLanguage;
 		if (bookStatus) match.bookStatus = bookStatus;
 		if (typeof isBorrowable === 'boolean') match.isBorrowable = isBorrowable;
 		if (typeof isPurchasable === 'boolean') match.isPurchasable = isPurchasable;
-		if (tags?.length) match.tags = { $in: tags };
 
 		if (typeof minPrice === 'number' || typeof maxPrice === 'number') {
-			match['price.amount'] = {};
-			if (typeof minPrice === 'number') match['price.amount'].$gte = minPrice;
-			if (typeof maxPrice === 'number') match['price.amount'].$lte = maxPrice;
+			match['bookPrice.amount'] = {};
+			if (typeof minPrice === 'number') match['bookPrice.amount'].$gte = minPrice;
+			if (typeof maxPrice === 'number') match['bookPrice.amount'].$lte = maxPrice;
 		}
 
 		if (typeof minRating === 'number') {
-			match['rating.average'] = { $gte: minRating };
+			match['bookRating.average'] = { $gte: minRating };
 		}
 	}
 }

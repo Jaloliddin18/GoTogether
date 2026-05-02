@@ -1,0 +1,188 @@
+import { Field, InputType, Int } from '@nestjs/graphql';
+import {
+	IsIn,
+	IsNotEmpty,
+	IsNumber,
+	IsOptional,
+	IsString,
+	Min,
+} from 'class-validator';
+import { Direction } from '../../enums/common.enum';
+import {
+	BookInventoryStatus,
+	BookInventoryType,
+	BookStorageZone,
+} from '../../enums/book-inventory.enum';
+
+const availableBookInventorySorts = [
+	'createdAt',
+	'updatedAt',
+	'bookInventoryStatus',
+	'bookInventoryType',
+	'bookStorageZone',
+	'bookTotalQuantity',
+	'bookSoldQuantity',
+];
+
+@InputType()
+export class BookShelfInput {
+	@IsNotEmpty()
+	@IsString()
+	@Field(() => String)
+	section: string;
+
+	@IsNotEmpty()
+	@IsString()
+	@Field(() => String)
+	row: string;
+
+	@IsNotEmpty()
+	@IsString()
+	@Field(() => String)
+	level: string;
+
+	@IsOptional()
+	@IsString()
+	@Field(() => String, { nullable: true })
+	slot?: string;
+}
+
+@InputType()
+export class BookInventoryLocationInput {
+	@IsNotEmpty()
+	@IsString()
+	@Field(() => String)
+	floorId: string;
+
+	@IsNotEmpty()
+	@IsNumber()
+	@Field(() => Number)
+	x: number;
+
+	@IsNotEmpty()
+	@IsNumber()
+	@Field(() => Number)
+	y: number;
+
+	@IsNotEmpty()
+	@IsNumber()
+	@Field(() => Number)
+	theta: number;
+}
+
+@InputType()
+export class BookInventoryPickupInput {
+	@IsNotEmpty()
+	@IsNumber()
+	@Field(() => Number)
+	mastHeightCm: number;
+
+	@IsNotEmpty()
+	@IsNumber()
+	@Field(() => Number)
+	forkDepthCm: number;
+
+	@IsOptional()
+	@IsNumber()
+	@Field(() => Number, { nullable: true })
+	gripWidthCm?: number;
+
+	@IsOptional()
+	@Field(() => Boolean, { nullable: true })
+	requiresContainer?: boolean;
+
+	@IsOptional()
+	@IsString()
+	@Field(() => String, { nullable: true })
+	containerId?: string;
+}
+
+@InputType()
+export class CreateBookInventoryInput {
+	@IsNotEmpty()
+	@Field(() => String)
+	bookId: string;
+
+	@IsNotEmpty()
+	@Field(() => BookInventoryType)
+	bookInventoryType: BookInventoryType;
+
+	@IsNotEmpty()
+	@Field(() => BookStorageZone)
+	bookStorageZone: BookStorageZone;
+
+	@IsOptional()
+	@Field(() => BookInventoryStatus, { nullable: true })
+	bookInventoryStatus?: BookInventoryStatus;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	bookTotalQuantity?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	bookSoldQuantity?: number;
+
+	@IsNotEmpty()
+	@Field(() => BookShelfInput)
+	bookShelf: BookShelfInput;
+
+	@IsNotEmpty()
+	@Field(() => BookInventoryLocationInput)
+	bookLocation: BookInventoryLocationInput;
+
+	@IsNotEmpty()
+	@Field(() => BookInventoryPickupInput)
+	bookPickup: BookInventoryPickupInput;
+}
+
+@InputType()
+export class BookInventorySearchInput {
+	@IsOptional()
+	@Field(() => String, { nullable: true })
+	bookId?: string;
+
+	@IsOptional()
+	@Field(() => BookInventoryType, { nullable: true })
+	bookInventoryType?: BookInventoryType;
+
+	@IsOptional()
+	@Field(() => BookStorageZone, { nullable: true })
+	bookStorageZone?: BookStorageZone;
+
+	@IsOptional()
+	@Field(() => BookInventoryStatus, { nullable: true })
+	bookInventoryStatus?: BookInventoryStatus;
+
+	@IsOptional()
+	@Field(() => String, { nullable: true })
+	floorId?: string;
+}
+
+@InputType()
+export class BookInventoriesInquiry {
+	@IsNotEmpty()
+	@Min(1)
+	@Field(() => Int)
+	page: number;
+
+	@IsNotEmpty()
+	@Min(1)
+	@Field(() => Int)
+	limit: number;
+
+	@IsOptional()
+	@IsIn(availableBookInventorySorts)
+	@Field(() => String, { nullable: true })
+	sort?: string;
+
+	@IsOptional()
+	@Field(() => Direction, { nullable: true })
+	direction?: Direction;
+
+	@IsOptional()
+	@Field(() => BookInventorySearchInput, { nullable: true })
+	search?: BookInventorySearchInput;
+}

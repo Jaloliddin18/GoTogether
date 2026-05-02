@@ -95,6 +95,10 @@ registerEnumType(BookLanguage, {
 });
 
 export enum BookStatus {
+	// Temporary compatibility for existing request flow.
+	AVAILABLE = 'AVAILABLE',
+	RESERVED = 'RESERVED',
+
 	ACTIVE = 'ACTIVE',
 	HIDDEN = 'HIDDEN',
 	SOLD = 'SOLD',

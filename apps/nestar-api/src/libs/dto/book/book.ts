@@ -11,42 +11,6 @@ import {
 import { TotalCounter } from '../member/member';
 
 @ObjectType()
-export class Shelf {
-	@Field(() => String, { nullable: true })
-	section?: string;
-
-	@Field(() => String, { nullable: true })
-	row?: string;
-
-	@Field(() => String, { nullable: true })
-	level?: string;
-}
-
-@ObjectType()
-export class BookLocation {
-	@Field(() => String, { nullable: true })
-	floorId?: string;
-
-	@Field(() => Number, { nullable: true })
-	x?: number;
-
-	@Field(() => Number, { nullable: true })
-	y?: number;
-
-	@Field(() => Number, { nullable: true })
-	theta?: number;
-}
-
-@ObjectType()
-export class BookPickup {
-	@Field(() => Int, { nullable: true })
-	mastHeightCm?: number;
-
-	@Field(() => Int, { nullable: true })
-	forkDepthCm?: number;
-}
-
-@ObjectType()
 export class BookPrice {
 	@Field(() => Number)
 	amount: number;
@@ -54,11 +18,8 @@ export class BookPrice {
 	@Field(() => String)
 	currency: string;
 
-	@Field(() => Number)
-	discountAmount: number;
-
-	@Field(() => Number)
-	discountPercent: number;
+	@Field(() => Number, { nullable: true })
+	discountPercent?: number;
 
 	@Field(() => Boolean)
 	isDiscounted: boolean;
@@ -73,25 +34,7 @@ export class BookDimensions {
 	heightCm: number;
 
 	@Field(() => Number)
-	thicknessCm: number;
-
-	@Field(() => Number)
 	weightGrams: number;
-}
-
-@ObjectType()
-export class BookRanks {
-	@Field(() => Number)
-	daily: number;
-
-	@Field(() => Number)
-	weekly: number;
-
-	@Field(() => Number)
-	monthly: number;
-
-	@Field(() => Number)
-	allTime: number;
 }
 
 @ObjectType()
@@ -109,67 +52,49 @@ export class Book {
 	_id: ObjectId;
 
 	@Field(() => String)
-	title: string;
-
-	@Field(() => String, { nullable: true })
-	subtitle?: string;
+	bookTitle: string;
 
 	@Field(() => String)
-	author: string;
-
-	@Field(() => [String], { nullable: true })
-	authors?: string[];
+	bookAuthor: string;
 
 	@Field(() => String)
-	isbn: string;
+	bookIsbn: string;
 
 	@Field(() => String, { nullable: true })
-	callNumber?: string;
+	bookCallNumber?: string;
 
-	@Field(() => [String], { nullable: true })
-	bookImages?: string[];
+	@Field(() => [String])
+	bookImages: string[];
 
 	@Field(() => BookType)
 	bookType: BookType;
 
 	@Field(() => BookCategory)
-	category: BookCategory;
+	bookCategory: BookCategory;
 
-	@Field(() => [String], { nullable: true })
-	subCategories?: string[];
+	@Field(() => BookAudience)
+	bookAudience: BookAudience;
 
-	@Field(() => BookAudience, { nullable: true })
-	audience?: BookAudience;
+	@Field(() => BookFormat)
+	bookFormat: BookFormat;
 
-	@Field(() => BookFormat, { nullable: true })
-	format?: BookFormat;
-
-	@Field(() => BookLanguage, { nullable: true })
-	language?: BookLanguage;
-
-	@Field(() => String, { nullable: true })
-	publisher?: string;
+	@Field(() => BookLanguage)
+	bookLanguage: BookLanguage;
 
 	@Field(() => Int, { nullable: true })
-	publishedYear?: number;
-
-	@Field(() => String, { nullable: true })
-	edition?: string;
+	bookPublishedYear?: number;
 
 	@Field(() => Int, { nullable: true })
-	pages?: number;
+	bookPages?: number;
 
 	@Field(() => String, { nullable: true })
-	shortDescription?: string;
+	bookDescription?: string;
 
-	@Field(() => String, { nullable: true })
-	description?: string;
-
-	@Field(() => BookPrice, { nullable: true })
-	price?: BookPrice;
+	@Field(() => BookPrice)
+	bookPrice: BookPrice;
 
 	@Field(() => BookDimensions, { nullable: true })
-	dimensions?: BookDimensions;
+	bookDimensions?: BookDimensions;
 
 	@Field(() => Boolean)
 	isBorrowable: boolean;
@@ -189,35 +114,17 @@ export class Book {
 	@Field(() => Number)
 	bookRank: number;
 
-	@Field(() => BookRanks)
-	bookRanks: BookRanks;
-
 	@Field(() => BookRating)
-	rating: BookRating;
-
-	@Field(() => [String], { nullable: true })
-	tags?: string[];
-
-	@Field(() => String, { nullable: true })
-	slug?: string;
-
-	@Field(() => Date, { nullable: true })
-	deletedAt?: Date;
-
-	@Field(() => Boolean)
-	available: boolean;
+	bookRating: BookRating;
 
 	@Field(() => BookStatus)
 	bookStatus: BookStatus;
 
-	@Field(() => Shelf, { nullable: true })
-	shelf?: Shelf;
+	@Field(() => Boolean, { nullable: true })
+	available?: boolean;
 
-	@Field(() => BookLocation, { nullable: true })
-	location?: BookLocation;
-
-	@Field(() => BookPickup, { nullable: true })
-	pickup?: BookPickup;
+	@Field(() => Date, { nullable: true })
+	deletedAt?: Date;
 
 	@Field(() => Date)
 	createdAt: Date;
