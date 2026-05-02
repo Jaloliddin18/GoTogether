@@ -7,6 +7,7 @@ import { ViewModule } from './view/view.module';
 import { FollowModule } from './follow/follow.module';
 import { BoardArticleModule } from './board-article/board-article.module';
 import { BookModule } from './book/book.module';
+import { BookInventoryModule } from './book-inventory/book-inventory.module';
 import { RobotModule } from './robot/robot.module';
 import { RequestModule } from './request/request.module';
 
@@ -20,6 +21,7 @@ import { RequestModule } from './request/request.module';
 		FollowModule,
 		BoardArticleModule,
 		BookModule,
+		BookInventoryModule,
 		RobotModule,
 		RequestModule,
 	],

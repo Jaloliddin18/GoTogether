@@ -7,22 +7,13 @@ import {
 	IsString,
 	Min,
 } from 'class-validator';
+import { availableBookInventorySorts } from '../../config';
 import { Direction } from '../../enums/common.enum';
 import {
 	BookInventoryStatus,
 	BookInventoryType,
 	BookStorageZone,
 } from '../../enums/book-inventory.enum';
-
-const availableBookInventorySorts = [
-	'createdAt',
-	'updatedAt',
-	'bookInventoryStatus',
-	'bookInventoryType',
-	'bookStorageZone',
-	'bookTotalQuantity',
-	'bookSoldQuantity',
-];
 
 @InputType()
 export class BookShelfInput {
@@ -157,8 +148,49 @@ export class BookInventorySearchInput {
 	bookInventoryStatus?: BookInventoryStatus;
 
 	@IsOptional()
+	@IsString()
 	@Field(() => String, { nullable: true })
 	floorId?: string;
+
+	@IsOptional()
+	@IsString()
+	@Field(() => String, { nullable: true })
+	section?: string;
+
+	@IsOptional()
+	@IsString()
+	@Field(() => String, { nullable: true })
+	row?: string;
+
+	@IsOptional()
+	@IsString()
+	@Field(() => String, { nullable: true })
+	level?: string;
+
+	@IsOptional()
+	@IsString()
+	@Field(() => String, { nullable: true })
+	slot?: string;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	minTotalQuantity?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	maxTotalQuantity?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	minSoldQuantity?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	maxSoldQuantity?: number;
 }
 
 @InputType()

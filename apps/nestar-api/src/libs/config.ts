@@ -27,6 +27,16 @@ export const availableBookSorts = [
 	'bookStatus',
 ];
 
+export const availableBookInventorySorts = [
+	'createdAt',
+	'updatedAt',
+	'bookInventoryStatus',
+	'bookInventoryType',
+	'bookStorageZone',
+	'bookTotalQuantity',
+	'bookSoldQuantity',
+];
+
 export const availableRobotSorts = [
 	'createdAt',
 	'updatedAt',

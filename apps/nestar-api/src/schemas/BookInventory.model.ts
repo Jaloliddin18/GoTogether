@@ -119,15 +119,15 @@ const BookInventorySchema = new Schema(
 
 BookInventorySchema.index({
 	bookId: 1,
-	inventoryType: 1,
-	storageZone: 1,
-	status: 1,
+	bookInventoryType: 1,
+	bookStorageZone: 1,
+	bookInventoryStatus: 1,
 });
 
 BookInventorySchema.index({
-	'location.floorId': 1,
-	'location.x': 1,
-	'location.y': 1,
+	'bookLocation.floorId': 1,
+	'bookLocation.x': 1,
+	'bookLocation.y': 1,
 });
 
 export default BookInventorySchema;
