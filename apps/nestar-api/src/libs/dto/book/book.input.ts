@@ -1,5 +1,6 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
 import {
+	IsArray,
 	IsBoolean,
 	IsIn,
 	IsNotEmpty,
@@ -11,60 +12,119 @@ import {
 } from 'class-validator';
 import { availableBookSorts } from '../../config';
 import { Direction } from '../../enums/common.enum';
-import { BookStatus } from '../../enums/book.enum';
+import {
+	BookAudience,
+	BookCategory,
+	BookFormat,
+	BookLanguage,
+	BookStatus,
+	BookType,
+} from '../../enums/book.enum';
 
 @InputType()
 export class ShelfInput {
-	@IsNotEmpty()
+	@IsOptional()
 	@IsString()
-	@Field(() => String)
-	section: string;
+	@Field(() => String, { nullable: true })
+	section?: string;
 
-	@IsNotEmpty()
+	@IsOptional()
 	@IsString()
-	@Field(() => String)
-	row: string;
+	@Field(() => String, { nullable: true })
+	row?: string;
 
-	@IsNotEmpty()
+	@IsOptional()
 	@IsString()
-	@Field(() => String)
-	level: string;
+	@Field(() => String, { nullable: true })
+	level?: string;
 }
 
 @InputType()
 export class BookLocationInput {
-	@IsNotEmpty()
+	@IsOptional()
 	@IsString()
-	@Field(() => String)
-	floorId: string;
+	@Field(() => String, { nullable: true })
+	floorId?: string;
 
-	@IsNotEmpty()
+	@IsOptional()
 	@IsNumber()
-	@Field(() => Number)
-	x: number;
+	@Field(() => Number, { nullable: true })
+	x?: number;
 
-	@IsNotEmpty()
+	@IsOptional()
 	@IsNumber()
-	@Field(() => Number)
-	y: number;
+	@Field(() => Number, { nullable: true })
+	y?: number;
 
-	@IsNotEmpty()
+	@IsOptional()
 	@IsNumber()
-	@Field(() => Number)
-	theta: number;
+	@Field(() => Number, { nullable: true })
+	theta?: number;
 }
 
 @InputType()
 export class BookPickupInput {
-	@IsNotEmpty()
+	@IsOptional()
 	@Min(0)
-	@Field(() => Int)
-	mastHeightCm: number;
+	@Field(() => Int, { nullable: true })
+	mastHeightCm?: number;
 
-	@IsNotEmpty()
+	@IsOptional()
 	@Min(0)
-	@Field(() => Int)
-	forkDepthCm: number;
+	@Field(() => Int, { nullable: true })
+	forkDepthCm?: number;
+}
+
+@InputType()
+export class BookPriceInput {
+	@IsOptional()
+	@Min(0)
+	@Field(() => Number, { nullable: true })
+	amount?: number;
+
+	@IsOptional()
+	@IsString()
+	@Length(1, 10)
+	@Field(() => String, { nullable: true })
+	currency?: string;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Number, { nullable: true })
+	discountAmount?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Number, { nullable: true })
+	discountPercent?: number;
+
+	@IsOptional()
+	@IsBoolean()
+	@Field(() => Boolean, { nullable: true })
+	isDiscounted?: boolean;
+}
+
+@InputType()
+export class BookDimensionsInput {
+	@IsOptional()
+	@Min(0)
+	@Field(() => Number, { nullable: true })
+	widthCm?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Number, { nullable: true })
+	heightCm?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Number, { nullable: true })
+	thicknessCm?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Number, { nullable: true })
+	weightGrams?: number;
 }
 
 @InputType()
@@ -74,30 +134,118 @@ export class CreateBookInput {
 	@Field(() => String)
 	title: string;
 
+	@IsOptional()
+	@Length(0, 200)
+	@Field(() => String, { nullable: true })
+	subtitle?: string;
+
 	@IsNotEmpty()
 	@Length(1, 120)
 	@Field(() => String)
 	author: string;
+
+	@IsOptional()
+	@IsArray()
+	@Field(() => [String], { nullable: true })
+	authors?: string[];
 
 	@IsNotEmpty()
 	@Length(3, 40)
 	@Field(() => String)
 	isbn: string;
 
-	@IsNotEmpty()
-	@Length(1, 80)
-	@Field(() => String)
-	callNumber: string;
+	@IsOptional()
+	@Length(0, 80)
+	@Field(() => String, { nullable: true })
+	callNumber?: string;
+
+	@IsOptional()
+	@IsArray()
+	@Field(() => [String], { nullable: true })
+	bookImages?: string[];
 
 	@IsNotEmpty()
-	@Length(1, 80)
-	@Field(() => String)
-	category: string;
+	@Field(() => BookType)
+	bookType: BookType;
+
+	@IsNotEmpty()
+	@Field(() => BookCategory)
+	category: BookCategory;
+
+	@IsOptional()
+	@IsArray()
+	@Field(() => [String], { nullable: true })
+	subCategories?: string[];
+
+	@IsOptional()
+	@Field(() => BookAudience, { nullable: true })
+	audience?: BookAudience;
+
+	@IsOptional()
+	@Field(() => BookFormat, { nullable: true })
+	format?: BookFormat;
+
+	@IsOptional()
+	@Field(() => BookLanguage, { nullable: true })
+	language?: BookLanguage;
+
+	@IsOptional()
+	@Length(0, 120)
+	@Field(() => String, { nullable: true })
+	publisher?: string;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	publishedYear?: number;
+
+	@IsOptional()
+	@Length(0, 80)
+	@Field(() => String, { nullable: true })
+	edition?: string;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Int, { nullable: true })
+	pages?: number;
+
+	@IsOptional()
+	@Length(0, 300)
+	@Field(() => String, { nullable: true })
+	shortDescription?: string;
 
 	@IsOptional()
 	@Length(0, 1000)
 	@Field(() => String, { nullable: true })
 	description?: string;
+
+	@IsOptional()
+	@Field(() => BookPriceInput, { nullable: true })
+	price?: BookPriceInput;
+
+	@IsOptional()
+	@Field(() => BookDimensionsInput, { nullable: true })
+	dimensions?: BookDimensionsInput;
+
+	@IsOptional()
+	@IsBoolean()
+	@Field(() => Boolean, { nullable: true })
+	isBorrowable?: boolean;
+
+	@IsOptional()
+	@IsBoolean()
+	@Field(() => Boolean, { nullable: true })
+	isPurchasable?: boolean;
+
+	@IsOptional()
+	@IsArray()
+	@Field(() => [String], { nullable: true })
+	tags?: string[];
+
+	@IsOptional()
+	@Length(0, 160)
+	@Field(() => String, { nullable: true })
+	slug?: string;
 
 	@IsOptional()
 	@IsBoolean()
@@ -108,21 +256,25 @@ export class CreateBookInput {
 	@Field(() => BookStatus, { nullable: true })
 	bookStatus?: BookStatus;
 
-	@IsNotEmpty()
-	@Field(() => ShelfInput)
-	shelf: ShelfInput;
+	@IsOptional()
+	@Field(() => ShelfInput, { nullable: true })
+	shelf?: ShelfInput;
 
-	@IsNotEmpty()
-	@Field(() => BookLocationInput)
-	location: BookLocationInput;
+	@IsOptional()
+	@Field(() => BookLocationInput, { nullable: true })
+	location?: BookLocationInput;
 
-	@IsNotEmpty()
-	@Field(() => BookPickupInput)
-	pickup: BookPickupInput;
+	@IsOptional()
+	@Field(() => BookPickupInput, { nullable: true })
+	pickup?: BookPickupInput;
 }
 
 @InputType()
 export class BookSearchInput {
+	@IsOptional()
+	@Field(() => String, { nullable: true })
+	keyword?: string;
+
 	@IsOptional()
 	@Field(() => String, { nullable: true })
 	title?: string;
@@ -140,16 +292,65 @@ export class BookSearchInput {
 	callNumber?: string;
 
 	@IsOptional()
-	@Field(() => String, { nullable: true })
-	category?: string;
+	@Field(() => BookCategory, { nullable: true })
+	category?: BookCategory;
 
 	@IsOptional()
-	@Field(() => Boolean, { nullable: true })
-	available?: boolean;
+	@IsArray()
+	@Field(() => [String], { nullable: true })
+	subCategories?: string[];
+
+	@IsOptional()
+	@Field(() => BookType, { nullable: true })
+	bookType?: BookType;
+
+	@IsOptional()
+	@Field(() => BookAudience, { nullable: true })
+	audience?: BookAudience;
+
+	@IsOptional()
+	@Field(() => BookFormat, { nullable: true })
+	format?: BookFormat;
+
+	@IsOptional()
+	@Field(() => BookLanguage, { nullable: true })
+	language?: BookLanguage;
 
 	@IsOptional()
 	@Field(() => BookStatus, { nullable: true })
 	bookStatus?: BookStatus;
+
+	@IsOptional()
+	@Field(() => Boolean, { nullable: true })
+	isBorrowable?: boolean;
+
+	@IsOptional()
+	@Field(() => Boolean, { nullable: true })
+	isPurchasable?: boolean;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Number, { nullable: true })
+	minPrice?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Number, { nullable: true })
+	maxPrice?: number;
+
+	@IsOptional()
+	@Min(0)
+	@Field(() => Number, { nullable: true })
+	minRating?: number;
+
+	@IsOptional()
+	@IsArray()
+	@Field(() => [String], { nullable: true })
+	tags?: string[];
+
+	@IsOptional()
+	@Field(() => Boolean, { nullable: true })
+	available?: boolean;
 }
 
 @InputType()

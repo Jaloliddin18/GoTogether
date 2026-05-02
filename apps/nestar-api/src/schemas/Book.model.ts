@@ -1,61 +1,142 @@
 import { Schema } from 'mongoose';
-import { BookStatus } from '../libs/enums/book.enum';
+import {
+	BookAudience,
+	BookCategory,
+	BookFormat,
+	BookLanguage,
+	BookStatus,
+	BookType,
+} from '../libs/enums/book.enum';
 
 const BookSchema = new Schema(
 	{
-		title: {
+		bookTitle: {
 			type: String,
 			required: true,
 		},
-		author: {
+
+		bookAuthor: {
 			type: String,
 			required: true,
 		},
-		isbn: {
+
+		bookIsbn: {
 			type: String,
 			required: true,
 			index: { unique: true, sparse: true },
 		},
-		callNumber: {
-			type: String,
+		bookCallNumber: {
+			type: String, // where is book on shelf
+		},
+
+		bookImages: {
+			type: [String],
 			required: true,
 		},
-		category: {
+
+		bookType: {
 			type: String,
+			enum: BookType,
 			required: true,
 		},
-		description: {
+		bookCategory: {
 			type: String,
-			default: '',
+			enum: BookCategory,
+			required: true,
 		},
-		available: {
+
+		bookAudience: {
+			type: String,
+			enum: BookAudience,
+			required: true,
+		},
+
+		bookFormat: {
+			type: String,
+			enum: BookFormat,
+			required: true,
+		},
+
+		bookLanguage: {
+			type: String,
+			enum: BookLanguage,
+			required: true,
+		},
+
+		bookPublishedYear: {
+			type: Number,
+		},
+
+		bookPages: {
+			type: Number,
+		},
+
+		bookDescription: {
+			type: String,
+		},
+
+		bookPrice: {
+			amount: { type: Number },
+			currency: { type: String, default: 'KRW' },
+			discountPercent: { type: Number },
+			isDiscounted: { type: Boolean, default: false },
+			required: true,
+		},
+
+		bookDimensions: {
+			widthCm: { type: Number, default: 0 },
+			heightCm: { type: Number, default: 0 },
+			weightGrams: { type: Number, default: 0 },
+		},
+
+		isBorrowable: {
 			type: Boolean,
 			default: true,
 		},
+
+		isPurchasable: {
+			type: Boolean,
+			default: true,
+		},
+
+		bookLikes: {
+			type: Number,
+			default: 0,
+		},
+
+		bookViews: {
+			type: Number,
+			default: 0,
+		},
+
+		bookComments: {
+			type: Number,
+			default: 0,
+		},
+
+		bookRank: {
+			type: Number,
+			default: 0,
+		},
+
+		bookRating: {
+			average: { type: Number, default: 0 },
+			count: { type: Number, default: 0 },
+		},
+
 		bookStatus: {
 			type: String,
 			enum: BookStatus,
-			default: BookStatus.AVAILABLE,
+			default: BookStatus.ACTIVE,
 		},
-		shelf: {
-			section: { type: String, required: true },
-			row: { type: String, required: true },
-			level: { type: String, required: true },
-		},
-		location: {
-			floorId: { type: String, required: true },
-			x: { type: Number, required: true },
-			y: { type: Number, required: true },
-			theta: { type: Number, required: true },
-		},
-		pickup: {
-			mastHeightCm: { type: Number, required: true },
-			forkDepthCm: { type: Number, required: true },
+
+		deletedAt: {
+			type: Date,
 		},
 	},
 	{ timestamps: true, collection: 'books' },
 );
 
-BookSchema.index({ title: 1, author: 1, callNumber: 1, category: 1 });
+BookSchema.index({ bookTitle: 1, bookAuthor: 1, bookIsbn: 1, bookCategory: 1 });
 
 export default BookSchema;

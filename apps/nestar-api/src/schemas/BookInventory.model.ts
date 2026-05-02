@@ -1,0 +1,133 @@
+import { Schema, Types } from 'mongoose';
+import {
+	BookInventoryStatus,
+	BookInventoryType,
+	BookStorageZone,
+} from '../libs/enums/book-inventory.enum';
+
+const BookInventorySchema = new Schema(
+	{
+		bookId: {
+			type: Types.ObjectId,
+			required: true,
+			ref: 'Book',
+			index: true,
+		},
+
+		bookInventoryType: {
+			type: String,
+			enum: BookInventoryType,
+			required: true,
+			index: true,
+		},
+
+		bookStorageZone: {
+			type: String,
+			enum: BookStorageZone,
+			required: true,
+			index: true,
+		},
+
+		bookInventoryStatus: {
+			type: String,
+			enum: BookInventoryStatus,
+			default: BookInventoryStatus.AVAILABLE,
+			index: true,
+		},
+
+		bookTotalQuantity: {
+			type: Number,
+			default: 1,
+		},
+
+		bookSoldQuantity: {
+			type: Number,
+			default: 0,
+		},
+
+		bookShelf: {
+			section: {
+				type: String,
+				required: true,
+			},
+			row: {
+				type: String,
+				required: true,
+			},
+			level: {
+				type: String,
+				required: true,
+			},
+			slot: {
+				type: String,
+				default: '',
+			},
+		},
+
+		bookLocation: {
+			floorId: {
+				type: String,
+				required: true,
+			},
+			x: {
+				type: Number,
+				required: true,
+			},
+			y: {
+				type: Number,
+				required: true,
+			},
+			theta: {
+				type: Number,
+				required: true,
+			},
+		},
+
+		bookPickup: {
+			mastHeightCm: {
+				type: Number,
+				required: true,
+			},
+			forkDepthCm: {
+				type: Number,
+				required: true,
+			},
+			gripWidthCm: {
+				type: Number,
+				default: 0,
+			},
+			requiresContainer: {
+				type: Boolean,
+				default: true,
+			},
+			containerId: {
+				type: String,
+				default: '',
+			},
+		},
+
+		deletedAt: {
+			type: Date,
+			default: null,
+		},
+	},
+	{
+		timestamps: true,
+		collection: 'bookInventories',
+	},
+);
+
+BookInventorySchema.index({
+	bookId: 1,
+	inventoryType: 1,
+	storageZone: 1,
+	status: 1,
+});
+
+BookInventorySchema.index({
+	'location.floorId': 1,
+	'location.x': 1,
+	'location.y': 1,
+});
+
+export default BookInventorySchema;

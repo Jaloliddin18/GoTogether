@@ -28,13 +28,15 @@ export class BookService {
 	}
 
 	public async getBookById(bookId: ObjectId): Promise<Book> {
-		const result: Book = await this.bookModel.findOne({ _id: bookId }).exec();
+		const result: Book = await this.bookModel
+			.findOne({ _id: bookId, deletedAt: null })
+			.exec();
 		if (!result) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
 		return result;
 	}
 
 	public async getBooks(input: BooksInquiry): Promise<Books> {
-		const match: T = {};
+		const match: T = { deletedAt: null };
 		const sort: T = {
 			[input?.sort ?? 'createdAt']: input?.direction ?? Direction.DESC,
 		};
@@ -87,15 +89,66 @@ export class BookService {
 	private shapeMatchQuery(match: T, input: BooksInquiry): void {
 		if (!input.search || Object.keys(input.search).length === 0) return;
 
-		const { title, author, isbn, callNumber, category, available, bookStatus } =
-			input.search;
+		const {
+			keyword,
+			title,
+			author,
+			isbn,
+			callNumber,
+			category,
+			subCategories,
+			bookType,
+			audience,
+			format,
+			language,
+			bookStatus,
+			isBorrowable,
+			isPurchasable,
+			minPrice,
+			maxPrice,
+			minRating,
+			tags,
+			available,
+		} = input.search;
+
+		if (keyword) {
+			const regex = new RegExp(keyword, 'i');
+			match.$or = [
+				{ title: { $regex: regex } },
+				{ subtitle: { $regex: regex } },
+				{ author: { $regex: regex } },
+				{ authors: { $elemMatch: { $regex: regex } } },
+				{ isbn: { $regex: regex } },
+				{ callNumber: { $regex: regex } },
+				{ publisher: { $regex: regex } },
+				{ tags: { $elemMatch: { $regex: regex } } },
+			];
+		}
 
 		if (title) match.title = { $regex: new RegExp(title, 'i') };
 		if (author) match.author = { $regex: new RegExp(author, 'i') };
 		if (isbn) match.isbn = { $regex: new RegExp(isbn, 'i') };
 		if (callNumber) match.callNumber = { $regex: new RegExp(callNumber, 'i') };
-		if (category) match.category = { $regex: new RegExp(category, 'i') };
+		if (category) match.category = category;
+		if (subCategories?.length) match.subCategories = { $in: subCategories };
+		if (bookType) match.bookType = bookType;
+		if (audience) match.audience = audience;
+		if (format) match.format = format;
+		if (language) match.language = language;
 		if (typeof available === 'boolean') match.available = available;
 		if (bookStatus) match.bookStatus = bookStatus;
+		if (typeof isBorrowable === 'boolean') match.isBorrowable = isBorrowable;
+		if (typeof isPurchasable === 'boolean') match.isPurchasable = isPurchasable;
+		if (tags?.length) match.tags = { $in: tags };
+
+		if (typeof minPrice === 'number' || typeof maxPrice === 'number') {
+			match['price.amount'] = {};
+			if (typeof minPrice === 'number') match['price.amount'].$gte = minPrice;
+			if (typeof maxPrice === 'number') match['price.amount'].$lte = maxPrice;
+		}
+
+		if (typeof minRating === 'number') {
+			match['rating.average'] = { $gte: minRating };
+		}
 	}
 }
