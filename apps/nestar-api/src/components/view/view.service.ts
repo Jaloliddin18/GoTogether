@@ -7,6 +7,7 @@ import { T } from '../../libs/types/common';
 import { OrdinaryInquiry } from '../../libs/dto/book/book.input';
 import { Books } from '../../libs/dto/book/book';
 import { ViewGroup } from '../../libs/enums/view.enum';
+import { lookupAuthMemberLiked } from '../../libs/config';
 
 @Injectable()
 export class ViewService {
@@ -54,6 +55,8 @@ export class ViewService {
 						list: [
 							{ $skip: (page - 1) * limit },
 							{ $limit: limit },
+							lookupAuthMemberLiked(memberId, '$visitedBook._id'),
+							{ $addFields: { 'visitedBook.meLiked': '$meLiked' } },
 						],
 						metaCounter: [{ $count: 'total' }],
 					},

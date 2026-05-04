@@ -49,7 +49,10 @@ export class BookService {
 			deletedAt: null,
 			bookStatus: { $ne: BookStatus.DELETED },
 		};
-		const targetBook: Book = await this.bookModel.findOne(search).lean().exec();
+		const foundBooks: Book[] = await this.bookModel
+			.aggregate([{ $match: search }, lookupAuthMemberLiked(memberId)])
+			.exec();
+		const targetBook: Book = foundBooks[0];
 		if (!targetBook) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
 
 		if (memberId) {

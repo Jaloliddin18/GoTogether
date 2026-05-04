@@ -8,6 +8,7 @@ import { Message } from '../../libs/enums/common.enum';
 import { OrdinaryInquiry } from '../../libs/dto/book/book.input';
 import { Books } from '../../libs/dto/book/book';
 import { LikeGroup } from '../../libs/enums/like.enum';
+import { lookupAuthMemberLiked } from '../../libs/config';
 
 @Injectable()
 export class LikeService {
@@ -68,6 +69,8 @@ export class LikeService {
 						list: [
 							{ $skip: (page - 1) * limit },
 							{ $limit: limit },
+							lookupAuthMemberLiked(memberId, '$favoriteBook._id'),
+							{ $addFields: { 'favoriteBook.meLiked': '$meLiked' } },
 						],
 						metaCounter: [{ $count: 'total' }],
 					},
