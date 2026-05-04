@@ -75,10 +75,7 @@ export class BookService {
 		return targetBook;
 	}
 
-	public async updateBook(
-		memberId: ObjectId | null,
-		input: UpdateBookInput,
-	): Promise<Book> {
+	public async updateBook(input: UpdateBookInput): Promise<Book> {
 		let { bookStatus, deletedAt } = input;
 		const search: T = {
 			_id: input._id,
@@ -201,10 +198,6 @@ export class BookService {
 		if (!result.length)
 			throw new InternalServerErrorException(Message.NO_DATA_FOUND);
 		return result[0];
-	}
-
-	public async updateBookByAdmin(input: UpdateBookInput): Promise<Book> {
-		return await this.updateBook(null, input);
 	}
 
 	public async removeBookByAdmin(bookId: ObjectId): Promise<Book> {

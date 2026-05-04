@@ -68,11 +68,10 @@ export class BookResolver {
 	@Mutation(() => Book)
 	public async updateBook(
 		@Args('input') input: UpdateBookInput,
-		@AuthMember('_id') memberId: ObjectId,
 	): Promise<Book> {
 		console.log('Mutation: updateBook');
 		input._id = shapeIntoMongoObjectId(input._id);
-		return await this.bookService.updateBook(memberId, input);
+		return await this.bookService.updateBook(input);
 	}
 
 	@UseGuards(AuthGuard)
@@ -104,17 +103,6 @@ export class BookResolver {
 		console.log('Mutation: likeTargetBook');
 		const likeRefId = shapeIntoMongoObjectId(input);
 		return await this.bookService.likeTargetBook(memberId, likeRefId);
-	}
-
-	@Roles(MemberType.ADMIN)
-	@UseGuards(RolesGuard)
-	@Mutation(() => Book)
-	public async updateBookByAdmin(
-		@Args('input') input: UpdateBookInput,
-	): Promise<Book> {
-		console.log('Mutation: updateBookByAdmin');
-		input._id = shapeIntoMongoObjectId(input._id);
-		return await this.bookService.updateBookByAdmin(input);
 	}
 
 	@Roles(MemberType.ADMIN)
