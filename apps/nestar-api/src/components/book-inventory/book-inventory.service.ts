@@ -95,12 +95,6 @@ export class BookInventoryService {
 		return result[0];
 	}
 
-	public async getAllBookInventoriesByAdmin(
-		input: BookInventoriesInquiry,
-	): Promise<BookInventories> {
-		return await this.getBookInventories(input);
-	}
-
 	public async updateBookInventory(
 		input: UpdateBookInventoryInput,
 	): Promise<BookInventory> {

@@ -44,16 +44,6 @@ export class BookInventoryResolver {
 
 	@Roles(MemberType.ADMIN)
 	@UseGuards(RolesGuard)
-	@Query(() => BookInventories)
-	public async getAllBookInventoriesByAdmin(
-		@Args('input') input: BookInventoriesInquiry,
-	): Promise<BookInventories> {
-		console.log('Query: getAllBookInventoriesByAdmin');
-		return await this.bookInventoryService.getAllBookInventoriesByAdmin(input);
-	}
-
-	@Roles(MemberType.ADMIN)
-	@UseGuards(RolesGuard)
 	@Query(() => BookInventory)
 	public async getBookInventory(
 		@Args('bookInventoryId') input: string,
