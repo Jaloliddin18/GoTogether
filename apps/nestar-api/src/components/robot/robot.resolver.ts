@@ -3,11 +3,7 @@ import { UseGuards } from '@nestjs/common';
 import { RobotService } from './robot.service';
 import { Robot, Robots } from '../../libs/dto/robot/robot';
 import { CreateRobotInput, RobotsInquiry } from '../../libs/dto/robot/robot.input';
-import {
-	UpdateRobotOnlineStateInput,
-	UpdateRobotPoseInput,
-	UpdateRobotStatusInput,
-} from '../../libs/dto/robot/robot.update';
+import { UpdateRobotInput } from '../../libs/dto/robot/robot.update';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { MemberType } from '../../libs/enums/member.enum';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -45,30 +41,10 @@ export class RobotResolver {
 	@Roles(MemberType.ADMIN)
 	@UseGuards(RolesGuard)
 	@Mutation(() => Robot)
-	public async updateRobotStatus(
-		@Args('input') input: UpdateRobotStatusInput,
+	public async updateRobot(
+		@Args('input') input: UpdateRobotInput,
 	): Promise<Robot> {
-		console.log('Mutation: updateRobotStatus');
-		return await this.robotService.updateRobotStatus(input);
-	}
-
-	@Roles(MemberType.ADMIN)
-	@UseGuards(RolesGuard)
-	@Mutation(() => Robot)
-	public async updateRobotPose(
-		@Args('input') input: UpdateRobotPoseInput,
-	): Promise<Robot> {
-		console.log('Mutation: updateRobotPose');
-		return await this.robotService.updateRobotPose(input);
-	}
-
-	@Roles(MemberType.ADMIN)
-	@UseGuards(RolesGuard)
-	@Mutation(() => Robot)
-	public async updateRobotOnlineState(
-		@Args('input') input: UpdateRobotOnlineStateInput,
-	): Promise<Robot> {
-		console.log('Mutation: updateRobotOnlineState');
-		return await this.robotService.updateRobotOnlineState(input);
+		console.log('Mutation: updateRobot');
+		return await this.robotService.updateRobot(input);
 	}
 }

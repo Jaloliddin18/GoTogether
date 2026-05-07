@@ -1,7 +1,6 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
 import {
 	IsBoolean,
-	IsNotEmpty,
 	IsNumber,
 	IsOptional,
 	IsString,
@@ -37,9 +36,14 @@ class RobotPoseUpdateInput {
 
 @InputType()
 export class UpdateRobotInput {
-	@IsNotEmpty()
-	@Field(() => String)
-	_id: ObjectId;
+	@IsOptional()
+	@Field(() => String, { nullable: true })
+	_id?: ObjectId;
+
+	@IsOptional()
+	@IsString()
+	@Field(() => String, { nullable: true })
+	robotId?: string;
 
 	@IsOptional()
 	@Length(2, 120)
@@ -68,66 +72,4 @@ export class UpdateRobotInput {
 	@IsOptional()
 	@Field(() => RobotPoseUpdateInput, { nullable: true })
 	currentPose?: RobotPoseUpdateInput;
-}
-
-@InputType()
-export class UpdateRobotStatusInput {
-	@IsNotEmpty()
-	@Field(() => String)
-	robotId: string;
-
-	@IsNotEmpty()
-	@Field(() => RobotStatus)
-	status: RobotStatus;
-
-	@IsOptional()
-	@Min(0)
-	@Max(100)
-	@Field(() => Int, { nullable: true })
-	battery?: number;
-
-	@IsOptional()
-	@Field(() => Date, { nullable: true })
-	lastSeenAt?: Date;
-
-	@IsOptional()
-	@Field(() => String, { nullable: true })
-	currentRequestId?: string;
-}
-
-@InputType()
-export class UpdateRobotPoseInput {
-	@IsNotEmpty()
-	@Field(() => String)
-	robotId: string;
-
-	@IsNotEmpty()
-	@Field(() => RobotPoseUpdateInput)
-	currentPose: RobotPoseUpdateInput;
-
-	@IsOptional()
-	@Min(0)
-	@Max(100)
-	@Field(() => Int, { nullable: true })
-	battery?: number;
-
-	@IsOptional()
-	@Field(() => Date, { nullable: true })
-	lastSeenAt?: Date;
-}
-
-@InputType()
-export class UpdateRobotOnlineStateInput {
-	@IsNotEmpty()
-	@Field(() => String)
-	robotId: string;
-
-	@IsNotEmpty()
-	@IsBoolean()
-	@Field(() => Boolean)
-	isOnline: boolean;
-
-	@IsOptional()
-	@Field(() => Date, { nullable: true })
-	lastSeenAt?: Date;
 }

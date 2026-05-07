@@ -10,12 +10,7 @@ import { Direction, Message } from '../../libs/enums/common.enum';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { Robot, Robots } from '../../libs/dto/robot/robot';
 import { CreateRobotInput, RobotsInquiry } from '../../libs/dto/robot/robot.input';
-import {
-	UpdateRobotOnlineStateInput,
-	UpdateRobotPoseInput,
-	UpdateRobotStatusInput,
-} from '../../libs/dto/robot/robot.update';
-import { RobotStatus } from '../../libs/enums/robot.enum';
+import { UpdateRobotInput } from '../../libs/dto/robot/robot.update';
 
 @Injectable()
 export class RobotService {
@@ -73,37 +68,29 @@ export class RobotService {
 		return result[0];
 	}
 
-	public async updateRobotStatus(input: UpdateRobotStatusInput): Promise<Robot> {
-		const update: T = {
-			status: input.status,
-			lastSeenAt: input.lastSeenAt ?? new Date(),
-		};
+	public async updateRobot(input: UpdateRobotInput): Promise<Robot> {
+		const { _id, robotId } = input;
+		if (!_id && !robotId) {
+			throw new BadRequestException(Message.BAD_REQUEST);
+		}
+
+		const query: T = {};
+		if (_id) query._id = shapeIntoMongoObjectId(String(_id));
+		else if (robotId) query.robotId = robotId;
+
+		const update: T = {};
+
+		if (input.name !== undefined) update.name = input.name;
+		if (input.status !== undefined) update.status = input.status;
 		if (typeof input.battery === 'number') update.battery = input.battery;
+		if (typeof input.isOnline === 'boolean') update.isOnline = input.isOnline;
+
 		if (input.currentRequestId !== undefined) {
 			update.currentRequestId = input.currentRequestId
 				? shapeIntoMongoObjectId(input.currentRequestId)
 				: null;
 		}
-		if (
-			input.status !== RobotStatus.OFFLINE &&
-			input.status !== RobotStatus.ERROR &&
-			input.status !== RobotStatus.MAINTENANCE
-		) {
-			update.isOnline = true;
-		}
 
-		const result: Robot = await this.robotModel
-			.findOneAndUpdate({ robotId: input.robotId }, update, { new: true })
-			.exec();
-		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
-		return result;
-	}
-
-	public async updateRobotPose(input: UpdateRobotPoseInput): Promise<Robot> {
-		const update: T = {
-			lastSeenAt: input.lastSeenAt ?? new Date(),
-		};
-		if (typeof input.battery === 'number') update.battery = input.battery;
 		if (input.currentPose?.floorId !== undefined) {
 			update['currentPose.floorId'] = input.currentPose.floorId;
 		}
@@ -117,24 +104,12 @@ export class RobotService {
 			update['currentPose.theta'] = input.currentPose.theta;
 		}
 
-		const result: Robot = await this.robotModel
-			.findOneAndUpdate({ robotId: input.robotId }, update, { new: true })
-			.exec();
-		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
-		return result;
-	}
-
-	public async updateRobotOnlineState(
-		input: UpdateRobotOnlineStateInput,
-	): Promise<Robot> {
-		const update: T = {
-			isOnline: input.isOnline,
-			lastSeenAt: input.lastSeenAt ?? new Date(),
-		};
-		if (!input.isOnline) update.status = RobotStatus.OFFLINE;
+		if (!Object.keys(update).length) {
+			throw new BadRequestException(Message.BAD_REQUEST);
+		}
 
 		const result: Robot = await this.robotModel
-			.findOneAndUpdate({ robotId: input.robotId }, update, { new: true })
+			.findOneAndUpdate(query, update, { new: true })
 			.exec();
 		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
 		return result;
