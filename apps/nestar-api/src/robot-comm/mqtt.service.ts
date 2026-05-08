@@ -257,6 +257,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			await this.robotModel
 				.findOneAndUpdate({ _id: robot._id }, { $set: robotUpdate }, { new: true })
 				.exec();
+			this.clearOfflineTimeout(payloadRobotId);
 
 			const activeRequest = await this.findActiveRequestByRobot(robot._id);
 			if (!activeRequest) {
@@ -410,6 +411,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 					{ new: true },
 				)
 				.exec();
+			this.clearOfflineTimeout(payloadRobotId);
 
 			const activeRequest = await this.findActiveRequestByRobot(robot._id);
 			if (!activeRequest) {
