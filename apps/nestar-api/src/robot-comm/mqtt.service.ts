@@ -268,10 +268,10 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			}
 
 			const requestId: string = String(activeRequest._id);
-			if (activeRequest.status === RequestStatus.READY) {
-				this.clearOfflineTimeout(payloadRobotId);
-			} else {
+			if (this.isOfflineTimeoutEligibleStatus(activeRequest.status)) {
 				this.startOfflineTimeout(payloadRobotId, requestId);
+			} else {
+				this.clearOfflineTimeout(payloadRobotId);
 			}
 
 			let currentRequest = activeRequest;
@@ -452,6 +452,13 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			}
 
 			const requestId: string = String(activeRequest._id);
+			if (!this.isOfflineTimeoutEligibleStatus(activeRequest.status)) {
+				this.clearOfflineTimeout(payloadRobotId);
+				this.logger.log(
+					`Skipping offline timeout start for robotId=${payloadRobotId}, requestId=${requestId}, status=${activeRequest.status}`,
+				);
+				return;
+			}
 			this.startOfflineTimeout(payloadRobotId, requestId);
 
 			this.emitToRequestRoom(requestId, 'robotPosition', {
@@ -508,6 +515,14 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			if (!request) {
 				this.logger.warn(
 					`Offline timeout fired but request not found for requestId=${requestId}`,
+				);
+				return;
+			}
+
+			if (request.status === RequestStatus.READY) {
+				this.clearOfflineTimeout(robotId);
+				this.logger.log(
+					`Offline timeout ignored for requestId=${requestId} because status is READY`,
 				);
 				return;
 			}
@@ -625,7 +640,9 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		return await this.requestModel
 			.findOne({
 				robotId: robotObjectId,
-				status: { $nin: this.terminalRequestStatuses },
+				status: {
+					$nin: [...this.terminalRequestStatuses, RequestStatus.READY],
+				},
 			})
 			.sort({ updatedAt: -1 })
 			.exec();
@@ -633,6 +650,14 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 
 	private isTerminalRequestStatus(status: RequestStatus | string): boolean {
 		return this.terminalRequestStatuses.includes(status as RequestStatus);
+	}
+
+	private isOfflineTimeoutEligibleStatus(
+		status: RequestStatus | string,
+	): boolean {
+		return (
+			status !== RequestStatus.READY && !this.isTerminalRequestStatus(status)
+		);
 	}
 
 	private mapToRobotStatus(state: string): RobotStatus | null {
