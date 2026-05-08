@@ -5,7 +5,6 @@ import { CommentModule } from './comment/comment.module';
 import { LikeModule } from './like/like.module';
 import { ViewModule } from './view/view.module';
 import { FollowModule } from './follow/follow.module';
-import { BoardArticleModule } from './board-article/board-article.module';
 import { BookModule } from './book/book.module';
 import { BookInventoryModule } from './book-inventory/book-inventory.module';
 import { RobotModule } from './robot/robot.module';
@@ -14,14 +13,13 @@ import { TwitModule } from './twit/twit.module';
 import { TwitCommentModule } from './twit-comment/twit-comment.module';
 
 @Module({
-		imports: [
-			MemberModule,
-			AuthModule,
+	imports: [
+		MemberModule,
+		AuthModule,
 		CommentModule,
 		LikeModule,
 		ViewModule,
 		FollowModule,
-		BoardArticleModule,
 		BookModule,
 		BookInventoryModule,
 		RobotModule,

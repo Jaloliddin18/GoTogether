@@ -7,7 +7,6 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, ObjectId } from 'mongoose';
 import { MemberService } from '../member/member.service';
 import { BookService } from '../book/book.service';
-import { BoardArticleService } from '../board-article/board-article.service';
 import { Comment, Comments } from '../../libs/dto/comment/comment';
 import {
 	CommentInput,
@@ -25,7 +24,6 @@ export class CommentService {
 		@InjectModel('Comment') private readonly commentModel: Model<Comment>,
 		private readonly memberService: MemberService,
 		private readonly bookService: BookService,
-		private readonly boardArticleService: BoardArticleService,
 	) {}
 
 	public async createComment(
@@ -53,12 +51,7 @@ export class CommentService {
 				break;
 
 			case CommentGroup.ARTICLE:
-				await this.boardArticleService.boardArticleStatsEditor({
-					_id: input.commentRefId,
-					targetKey: 'articleComments',
-					modifier: 1,
-				});
-				break;
+				throw new BadRequestException(Message.BAD_REQUEST);
 
 			case CommentGroup.MEMBER:
 				await this.memberService.memberStatsEditor({

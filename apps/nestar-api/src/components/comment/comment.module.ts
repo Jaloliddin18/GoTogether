@@ -6,16 +6,14 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import { MemberModule } from '../member/member.module';
 import { BookModule } from '../book/book.module';
-import { BoardArticleModule } from '../board-article/board-article.module';
 
 @Module({
 	imports: [
 		MongooseModule.forFeature([{ name: 'Comment', schema: CommentSchema }]),
-			AuthModule,
-			MemberModule,
-			BoardArticleModule,
-			BookModule,
-		],
+		AuthModule,
+		MemberModule,
+		BookModule,
+	],
 	providers: [CommentService, CommentResolver],
 	exports: [CommentService],
 })

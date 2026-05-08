@@ -65,13 +65,6 @@ export const REQUEST_RECEPTION_DESTINATION = {
 	theta: 3.14,
 };
 
-export const availabeBoardArticleSorts = [
-	'createdAt',
-	'updatedAt',
-	'articleLikes',
-	'articleViews',
-];
-
 export const availableCommentSorts = ['createdAt', 'updatedAt'];
 export const availableTwitSorts = [
 	'createdAt',
