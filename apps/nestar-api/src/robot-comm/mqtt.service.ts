@@ -357,6 +357,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 					message: payload.message ?? 'Your book is ready for pickup.',
 					timestamp: payload.timestamp,
 				});
+				this.clearOfflineTimeout(payloadRobotId);
 			}
 		} catch (error: unknown) {
 			const errorMessage =
