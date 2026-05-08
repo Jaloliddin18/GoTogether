@@ -211,6 +211,18 @@ export class TwitCommentService {
 		return result as unknown as TwitComment;
 	}
 
+	public async removeTwitCommentByAdmin(commentId: ObjectId): Promise<TwitComment> {
+		const result = await this.twitCommentModel
+			.findOneAndUpdate(
+				{ _id: commentId, deletedAt: null },
+				{ deletedAt: new Date() },
+				{ new: true },
+			)
+			.exec();
+		if (!result) throw new InternalServerErrorException(Message.REMOVE_FAILED);
+		return result as unknown as TwitComment;
+	}
+
 	private async checkTwitExists(twitId: ObjectId): Promise<void> {
 		const twit = await this.twitModel
 			.findOne({ _id: twitId, deletedAt: null })

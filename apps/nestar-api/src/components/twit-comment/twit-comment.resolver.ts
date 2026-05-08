@@ -13,6 +13,9 @@ import {
 	TwitCommentsInquiry,
 } from '../../libs/dto/twit-comment/twit-comment.input';
 import { UpdateTwitCommentInput } from '../../libs/dto/twit-comment/twit-comment.update';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { MemberType } from '../../libs/enums/member.enum';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 @Resolver()
 export class TwitCommentResolver {
@@ -75,5 +78,16 @@ export class TwitCommentResolver {
 		console.log('Mutation: likeTwitComment');
 		const commentId = shapeIntoMongoObjectId(input);
 		return await this.twitCommentService.likeTwitComment(memberId, commentId);
+	}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Mutation(() => TwitComment)
+	public async removeTwitCommentByAdmin(
+		@Args('commentId') input: string,
+	): Promise<TwitComment> {
+		console.log('Mutation: removeTwitCommentByAdmin');
+		const commentId = shapeIntoMongoObjectId(input);
+		return await this.twitCommentService.removeTwitCommentByAdmin(commentId);
 	}
 }
