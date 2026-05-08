@@ -40,6 +40,7 @@ import {
 	BookInventoryStatus,
 	BookInventoryType,
 } from '../../libs/enums/book-inventory.enum';
+import { MqttRobotService } from '../../robot-comm/mqtt.service';
 
 @Injectable()
 export class RequestService {
@@ -49,6 +50,7 @@ export class RequestService {
 		@InjectModel('BookInventory')
 		private readonly bookInventoryModel: Model<BookInventory>,
 		@InjectModel('Robot') private readonly robotModel: Model<Robot>,
+		private readonly mqttRobotService: MqttRobotService,
 	) {}
 
 	public async createDeliveryRequest(
@@ -162,6 +164,7 @@ export class RequestService {
 						{ new: true },
 					)
 					.exec();
+				this.mqttRobotService.subscribeToRobotTopics(robot.robotId);
 			}
 
 			return created;
