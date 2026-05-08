@@ -5,7 +5,8 @@ import {
 	WebSocketGateway,
 	WebSocketServer,
 } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
+import { Server } from 'ws';
+import * as WebSocket from 'ws';
 
 interface JoinRequestPayload {
 	requestId: string;
@@ -14,6 +15,15 @@ interface JoinRequestPayload {
 @WebSocketGateway({ transports: ['websocket'], secure: false })
 export class RobotGateway implements OnGatewayInit {
 	private readonly logger: Logger = new Logger('RobotGateway');
+	private readonly requestClients: Map<string, Set<WebSocket>> = new Map<
+		string,
+		Set<WebSocket>
+	>();
+	private readonly clientIds: WeakMap<WebSocket, string> = new WeakMap<
+		WebSocket,
+		string
+	>();
+	private clientSeq: number = 0;
 
 	@WebSocketServer()
 	server: Server;
@@ -23,82 +33,134 @@ export class RobotGateway implements OnGatewayInit {
 		this.logger.verbose(`Robot WebSocket server ready: ${Boolean(server)}`);
 	}
 
-	public getServer(): Server | null {
-		return this.server ?? null;
+	public getServer(): any | null {
+		if (!this.server) return null;
+		return {
+			to: (room: string) => ({
+				emit: (event: string, payload: object) => {
+					this.emitToRoom(room, event, payload);
+				},
+			}),
+		};
 	}
 
-	public handleConnection(client: Socket): void {
-		this.logger.verbose(`Robot gateway connection: ${client.id}`);
+	public handleConnection(client: WebSocket): void {
+		this.logger.verbose(`Robot gateway connection: ${this.getClientId(client)}`);
 	}
 
-	public handleDisconnect(client: Socket): void {
-		this.logger.verbose(`Robot gateway disconnection: ${client.id}`);
+	public handleDisconnect(client: WebSocket): void {
+		const clientId = this.getClientId(client);
+		this.removeClientFromRooms(client);
+		this.logger.verbose(`Robot gateway disconnection: ${clientId}`);
 	}
 
 	@SubscribeMessage('joinRequest')
-	public handleJoinRequest(client: Socket, payload: JoinRequestPayload): void {
-		const requestId: string = payload?.requestId?.trim?.() ?? '';
+	public handleJoinRequest(client: WebSocket, payload: JoinRequestPayload): void {
+		const requestId: string = this.extractRequestId(payload);
 		if (!requestId) {
-			this.logger.warn(`Invalid joinRequest payload from client ${client.id}`);
-			client.emit('error', { event: 'error', message: 'requestId is required' });
+			const clientId = this.getClientId(client);
+			this.logger.warn(`Invalid joinRequest payload from client ${clientId}`);
+			this.sendToClient(client, 'error', { message: 'requestId is required' });
 			return;
 		}
 
 		const room: string = this.getRequestRoom(requestId);
-		client.join(room);
-		this.logger.log(`Client ${client.id} joined room ${room}`);
-		client.emit('joined', { requestId });
+		this.addClientToRoom(client, room);
+		this.logger.log(`Client ${this.getClientId(client)} joined room ${room}`);
+		this.sendToClient(client, 'joined', { requestId });
 	}
 
 	public emitRobotPosition(requestId: string, payload: object): void {
-		if (!this.server) {
-			this.logger.warn('WebSocket server not ready, skipping emit');
-			return;
-		}
-		this.server.to(this.getRequestRoom(requestId)).emit('robotPosition', payload);
+		this.emitToRequestRoom(requestId, 'robotPosition', payload);
 	}
 
 	public emitRobotStatus(requestId: string, payload: object): void {
-		if (!this.server) {
-			this.logger.warn('WebSocket server not ready, skipping emit');
-			return;
-		}
-		this.server.to(this.getRequestRoom(requestId)).emit('robotStatus', payload);
+		this.emitToRequestRoom(requestId, 'robotStatus', payload);
 	}
 
 	public emitRequestUpdated(requestId: string, payload: object): void {
-		if (!this.server) {
-			this.logger.warn('WebSocket server not ready, skipping emit');
-			return;
-		}
-		this.server.to(this.getRequestRoom(requestId)).emit('requestUpdated', payload);
+		this.emitToRequestRoom(requestId, 'requestUpdated', payload);
 	}
 
 	public emitRobotOffline(requestId: string, payload: object): void {
-		if (!this.server) {
-			this.logger.warn('WebSocket server not ready, skipping emit');
-			return;
-		}
-		this.server.to(this.getRequestRoom(requestId)).emit('robotOffline', payload);
+		this.emitToRequestRoom(requestId, 'robotOffline', payload);
 	}
 
 	public emitBookNotFound(requestId: string, payload: object): void {
-		if (!this.server) {
-			this.logger.warn('WebSocket server not ready, skipping emit');
-			return;
-		}
-		this.server.to(this.getRequestRoom(requestId)).emit('bookNotFound', payload);
+		this.emitToRequestRoom(requestId, 'bookNotFound', payload);
 	}
 
 	public emitDeliveryReady(requestId: string, payload: object): void {
-		if (!this.server) {
-			this.logger.warn('WebSocket server not ready, skipping emit');
-			return;
+		this.emitToRequestRoom(requestId, 'deliveryReady', payload);
+	}
+
+	private extractRequestId(payload: JoinRequestPayload | string): string {
+		if (typeof payload === 'string') {
+			try {
+				const parsed = JSON.parse(payload) as JoinRequestPayload;
+				return parsed?.requestId?.trim?.() ?? '';
+			} catch {
+				return '';
+			}
 		}
-		this.server.to(this.getRequestRoom(requestId)).emit('deliveryReady', payload);
+		return payload?.requestId?.trim?.() ?? '';
 	}
 
 	private getRequestRoom(requestId: string): string {
 		return `request:${requestId}`;
+	}
+
+	private addClientToRoom(client: WebSocket, room: string): void {
+		const clients = this.requestClients.get(room) ?? new Set<WebSocket>();
+		clients.add(client);
+		this.requestClients.set(room, clients);
+	}
+
+	private removeClientFromRooms(client: WebSocket): void {
+		for (const [room, clients] of this.requestClients.entries()) {
+			if (clients.has(client)) {
+				clients.delete(client);
+				if (!clients.size) this.requestClients.delete(room);
+			}
+		}
+	}
+
+	private emitToRequestRoom(
+		requestId: string,
+		event: string,
+		payload: object,
+	): void {
+		const room = this.getRequestRoom(requestId);
+		this.emitToRoom(room, event, payload);
+	}
+
+	private emitToRoom(room: string, event: string, payload: object): void {
+		const clients = this.requestClients.get(room);
+		if (!clients || !clients.size) return;
+
+		for (const client of clients) {
+			this.sendToClient(client, event, payload);
+		}
+	}
+
+	private sendToClient(client: WebSocket, event: string, payload: object): void {
+		if (client.readyState !== WebSocket.OPEN) return;
+
+		client.send(
+			JSON.stringify({
+				event,
+				data: payload,
+			}),
+		);
+	}
+
+	private getClientId(client: WebSocket): string {
+		const existingId = this.clientIds.get(client);
+		if (existingId) return existingId;
+
+		this.clientSeq += 1;
+		const generatedId = `ws-${this.clientSeq}`;
+		this.clientIds.set(client, generatedId);
+		return generatedId;
 	}
 }
