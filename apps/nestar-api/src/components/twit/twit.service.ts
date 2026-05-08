@@ -6,10 +6,15 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, ObjectId } from 'mongoose';
 import { Twit, Twits } from '../../libs/dto/twit/twit';
-import { CreateTwitInput, TwitsInquiry } from '../../libs/dto/twit/twit.input';
+import {
+	AllTwitsInquiry,
+	CreateTwitInput,
+	TwitsInquiry,
+} from '../../libs/dto/twit/twit.input';
+import { TwitUpdate } from '../../libs/dto/twit/twit.update';
 import { Direction, Message } from '../../libs/enums/common.enum';
 import { T } from '../../libs/types/common';
-import { lookupMember } from '../../libs/config';
+import { lookupMember, shapeIntoMongoObjectId } from '../../libs/config';
 
 interface FollowDoc {
 	followerId: ObjectId;
@@ -162,6 +167,76 @@ export class TwitService {
 			)
 			.exec();
 		if (!result) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+		return result;
+	}
+
+	public async getAllTwitsByAdmin(input: AllTwitsInquiry): Promise<Twits> {
+		const sort: T = {
+			[input?.sort ?? 'createdAt']: input?.direction ?? Direction.DESC,
+		};
+		const match: T = {};
+
+		if (input.search?.text) {
+			match.text = { $regex: new RegExp(input.search.text.trim(), 'i') };
+		}
+		if (input.search?.memberId) {
+			match.memberId = shapeIntoMongoObjectId(input.search.memberId);
+		}
+		if (input.search?.isDeleted !== undefined) {
+			match.deletedAt = input.search.isDeleted ? { $ne: null } : null;
+		}
+
+		const result = await this.twitModel
+			.aggregate([
+				{ $match: match },
+				{ $sort: sort },
+				{
+					$facet: {
+						list: [
+							{ $skip: (input.page - 1) * input.limit },
+							{ $limit: input.limit },
+							lookupMember,
+							{ $unwind: '$memberData' },
+						],
+						metaCounter: [{ $count: 'total' }],
+					},
+				},
+			])
+			.exec();
+
+		if (!result.length)
+			throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+		return result[0];
+	}
+
+	public async updateTwitByAdmin(input: TwitUpdate): Promise<Twit> {
+		const update: T = {};
+		if (input.text !== undefined) update.text = input.text.trim();
+		if (input.image !== undefined) update.image = input.image;
+
+		if (!Object.keys(update).length)
+			throw new BadRequestException(Message.BAD_REQUEST);
+
+		const result = await this.twitModel
+			.findOneAndUpdate(
+				{ _id: input._id, deletedAt: null },
+				update,
+				{ new: true },
+			)
+			.exec();
+		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
+		return result;
+	}
+
+	public async removeTwitByAdmin(twitId: ObjectId): Promise<Twit> {
+		const result = await this.twitModel
+			.findOneAndUpdate(
+				{ _id: twitId, deletedAt: null },
+				{ deletedAt: new Date() },
+				{ new: true },
+			)
+			.exec();
+		if (!result) throw new InternalServerErrorException(Message.REMOVE_FAILED);
 		return result;
 	}
 }

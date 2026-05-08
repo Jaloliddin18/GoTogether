@@ -1,5 +1,6 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
-import { IsIn, IsNotEmpty, IsOptional, Length, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsNotEmpty, IsOptional, Length, Min } from 'class-validator';
+import type { ObjectId } from 'mongoose';
 import { availableTwitSorts } from '../../config';
 import { Direction } from '../../enums/common.enum';
 
@@ -46,4 +47,46 @@ export class TwitsInquiry {
 	@IsOptional()
 	@Field(() => TwitSearch, { nullable: true })
 	search?: TwitSearch;
+}
+
+@InputType()
+class AllTwitsSearch {
+	@IsOptional()
+	@Field(() => String, { nullable: true })
+	text?: string;
+
+	@IsOptional()
+	@Field(() => String, { nullable: true })
+	memberId?: ObjectId;
+
+	@IsOptional()
+	@IsBoolean()
+	@Field(() => Boolean, { nullable: true })
+	isDeleted?: boolean;
+}
+
+@InputType()
+export class AllTwitsInquiry {
+	@IsNotEmpty()
+	@Min(1)
+	@Field(() => Int)
+	page: number;
+
+	@IsNotEmpty()
+	@Min(1)
+	@Field(() => Int)
+	limit: number;
+
+	@IsOptional()
+	@IsIn(availableTwitSorts)
+	@Field(() => String, { nullable: true })
+	sort?: string;
+
+	@IsOptional()
+	@Field(() => Direction, { nullable: true })
+	direction?: Direction;
+
+	@IsOptional()
+	@Field(() => AllTwitsSearch, { nullable: true })
+	search?: AllTwitsSearch;
 }
