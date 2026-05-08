@@ -44,26 +44,24 @@ resolver/service/module/DTO pattern before writing new code.
 
 ---
 
-## What Codex Already Built (Phases 1–3 — Complete)
+## What Is Implemented
 
-### Schemas (apps/nestar-api/src/schemas/)
-- `Book.model.ts` — catalog fields, shelf coords, pickup params, `BookStatus` enum
-- `BookInventory.model.ts` — LIBRARY and COMMERCIAL inventory types
-- `Robot.model.ts` — robotId, status, battery, isOnline, currentPose
-- `Request.model.ts` — BORROW/PURCHASE flows, RequestStatus enum, timeline array
+### Core domains in place
+- `Book.model.ts`, `BookInventory.model.ts`, `Robot.model.ts`, `Request.model.ts`
+- BookInventory pickup uses fixed-gripper fields:
+  - `gripperOpenWidthCm`, `gripperCloseWidthCm`, `gripHoldSeconds`, `pickupDirection`
+- Old fork/container pickup fields are removed:
+  - `mastHeightCm`, `forkDepthCm`, `gripWidthCm`, `requiresContainer`, `containerId`
 
-### Modules (apps/nestar-api/src/components/)
-- `book/` — getBooks, getBook, createBook, updateBook, updateBookAvailability
-- `robot/` — getRobots, getRobot, createRobot, updateRobotStatus, updateRobotPose
-- `request/` — createDeliveryRequest, cancelRequest, getRequest, getSessionRequests
+### Request hardening in place
+- `cancelRequest` blocks terminal statuses (`COMPLETED`, `FAILED`, `CANCELLED`)
+- `updateRequestStatus` guards terminal-state re-entry
+- `createDeliveryRequest` validates `bookCallNumber` before inventory reservation
 
-### Tested and Working (Postman confirmed)
-- createBook, createBookInventory (LIBRARY + COMMERCIAL)
-- createRobot
-- BORROW request flow: selects LIBRARY inventory, assigns robot
-- PURCHASE request flow: selects COMMERCIAL inventory, routes to RECEPTION
-- cancelRequest: releases robot + inventory
-- Completing PURCHASE: sets paymentStatus=PAID, increments bookSoldQuantity, releases robot
+### Robot communication phases complete
+- Phase 4: MQTT module implemented (`src/robot-comm/*`)
+- Phase 5: dedicated robot gateway implemented (`src/socket/robot.gateway.ts`)
+- Phase 6: MQTT telemetry wired to MongoDB updates + WebSocket emits
 
 ---
 
@@ -175,6 +173,24 @@ JWT_SECRET=
 
 ---
 
+## Runtime Verification Status
+- Confirmed:
+  - build passes
+  - local MQTT broker connection works
+  - backend subscribed to `robot/robot_01/status` and `robot/robot_01/pose`
+  - MQTT status messages were received and parsed
+  - BORROW telemetry sequence was tested through `READY`
+  - request reached `READY` and stayed `READY` after >35s
+  - robot is released on `READY` (`IDLE`, `currentRequestId=null`, `isOnline=true`)
+  - pose telemetry path updates Robot pose data
+  - previous `server.to is not a function` adapter mismatch is fixed
+- Still pending final runtime checks:
+  - final `BOOK_NOT_FOUND` flow verification
+  - final pre-READY offline-timeout verification
+  - WebSocket client-side join/receive verification for `joinRequest` + robot events
+
+---
+
 ## Known Issues / Cleanup Backlog
 - Book image uploads still use `uploads/property` path — should be `uploads/book` (not urgent)
 - `Request.error` returns object with null fields on success — acceptable for now
@@ -192,3 +208,4 @@ JWT_SECRET=
   - pose/status telemetry updates Robot + active Request data
   - `BOOK_NOT_FOUND` and offline timeout paths fail request safely and release robot/inventory
   - request-scoped WebSocket emits for status/pose/ready/failure events
+  - READY keeps request at READY, clears timeout, releases robot, and avoids duplicate timeline entries

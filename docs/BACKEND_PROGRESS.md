@@ -1,46 +1,47 @@
 # Backend Progress Context
 
 ## 1. Project direction
-- This project is now a Smart Library/bookstore robot delivery backend (not real-estate/Nestar Property).
-- Students can BORROW library books to desk delivery.
-- Students can PURCHASE commercial books to reception pickup.
+- This backend is now for 같이Go Smart Library/bookstore robot delivery.
+- BORROW flow: library inventory to student desk.
+- PURCHASE flow: commercial inventory to reception.
 
 ## 2. Current backend domain model
-- Book = catalog/product data.
-- BookInventory = physical stock + pickup location/mechanism.
-- Robot = robot identity/state/pose.
-- Request = borrow/purchase delivery task.
+- Book = catalog/product metadata.
+- BookInventory = physical stock source + pickup configuration.
+- Robot = runtime robot state and pose.
+- Request = borrow/purchase delivery lifecycle.
 
 ## 3. Completed implementation
 
-### 3.1 BookInventory pickup refactor (fixed gripper)
+### 3.1 BookInventory fixed gripper refactor
 - Removed old pickup fields:
   - `mastHeightCm`
   - `forkDepthCm`
   - `gripWidthCm`
   - `requiresContainer`
   - `containerId`
-- Added fixed-gripper fields:
+- Current `bookPickup` fields:
   - `gripperOpenWidthCm`
   - `gripperCloseWidthCm`
   - `gripHoldSeconds`
   - `pickupDirection`
-- Robot pickup model is fixed gripper only:
+- Pickup mechanism model:
   - no fork lift
   - no moving arm
-  - gripper open/close only
-  - robot base drives to pickup coordinate and aligns by `pickupDirection`
-- Demo uses one floor, but `floorId` remains in `bookLocation` for multi-floor compatibility.
+  - fixed gripper open/close only
+  - robot body drives to pickup coordinate
+  - `pickupDirection` describes robot alignment direction
+  - demo uses one floor, but `floorId` remains in `bookLocation`
 
 ### 3.2 Request hardening fixes
-- `cancelRequest` now blocks terminal requests:
+- `cancelRequest` blocks terminal statuses:
   - `COMPLETED`
   - `FAILED`
   - `CANCELLED`
-- `updateRequestStatus` guards terminal requests from duplicate updates.
+- `updateRequestStatus` prevents terminal-state re-entry.
 - `createDeliveryRequest` validates `book.bookCallNumber` before inventory reservation because MQTT command payload requires `callNumber`.
 
-### 3.3 Phase 4 complete — MQTT robot communication module
+### 3.3 Phase 4 complete (MQTT module)
 - Added:
   - `apps/nestar-api/src/robot-comm/mqtt.types.ts`
   - `apps/nestar-api/src/robot-comm/mqtt.service.ts`
@@ -48,20 +49,25 @@
 - Registered `MqttRobotModule` in `AppModule`.
 - Added `mqtt` dependency.
 - `MQTT_BROKER_URL` controls broker connection.
-- Missing `MQTT_BROKER_URL` logs warning and disables robot comm safely (no app crash).
-- MQTT publish topic:
+- Missing `MQTT_BROKER_URL` logs warning and disables robot communication without crashing.
+- Command publish topic:
   - `robot/{robotId}/command`
-- MQTT subscribe topics:
+- Subscribed telemetry topics:
   - `robot/{robotId}/status`
   - `robot/{robotId}/pose`
 
-### 3.4 Phase 5 complete — dedicated robot gateway
-- Added gateway file:
+### 3.4 Phase 5 complete (RobotGateway)
+- Added dedicated robot gateway:
   - `apps/nestar-api/src/socket/robot.gateway.ts`
 - Registered `RobotGateway` in `SocketModule`.
-- Kept robot gateway separate from existing general/chat `SocketGateway`.
-- This backend uses plain `ws` adapter (not Socket.IO).
-- Robot gateway uses manual request-scoped room mapping:
+- Robot gateway is separated from existing chat/general `SocketGateway`.
+- Project WebSocket adapter is plain `ws` (not Socket.IO).
+- Runtime adapter mismatch fixed:
+  - removed Socket.IO room assumptions
+  - no `server.to(...)`
+  - no `client.join(...)`
+  - manual room mapping via `Map<string, Set<WebSocket>>`
+- Request room format:
   - `request:{requestId}`
 - Client event:
   - `joinRequest`
@@ -73,8 +79,8 @@
   - `bookNotFound`
   - `deliveryReady`
 
-### 3.5 Phase 6 complete — MQTT telemetry to MongoDB + WebSocket
-- Scope:
+### 3.5 Phase 6 complete (MQTT telemetry integration)
+- Main files:
   - `apps/nestar-api/src/robot-comm/mqtt.service.ts`
   - `apps/nestar-api/src/robot-comm/mqtt.module.ts`
 - Pose telemetry updates:
@@ -82,68 +88,88 @@
   - `Robot.lastSeenAt`
   - `Robot.isOnline`
 - Status telemetry updates:
-  - `Robot.status` when state maps to `RobotStatus`
+  - `Robot.status` when mapped
   - `Robot.battery`
   - `Robot.lastSeenAt`
   - `Robot.isOnline`
-  - active `Request.status` when state maps to `RequestStatus`
+  - active `Request.status` when mapped
   - `Request.timeline`
-- WebSocket emissions are request-scoped (`request:{requestId}`).
-- `BOOK_NOT_FOUND` handling:
-  - request marked `FAILED`
-  - request error set
-  - robot released to `IDLE`
-  - inventory reservation released
-  - `bookNotFound` + `requestUpdated` emitted
-- `READY` handling:
-  - `deliveryReady` emitted
-- Offline timeout handling:
-  - 30s timeout after last valid telemetry
+- Emits request-scoped WebSocket events to `request:{requestId}`.
+- 30-second robot offline timeout implemented:
+  - in-progress request fails if robot stops sending telemetry
   - robot marked offline
-  - request marked `FAILED`
+  - request set to `FAILED`
   - inventory reservation released
-  - `robotOffline` + `requestUpdated` emitted
+  - `robotOffline`/`requestUpdated` emitted
+- READY behavior finalized:
+  - `Request.status` remains `READY`
+  - offline timeout cleared on `READY`
+  - `Robot.status` becomes `IDLE`
+  - `Robot.currentRequestId` becomes `null`
+  - `Robot.isOnline` remains `true`
+  - request is not converted to `COMPLETED`
+  - inventory is not released on `READY`
+- Duplicate telemetry hardening:
+  - duplicate same-status telemetry does not append duplicate timeline entries
+  - stale statuses after `READY` are ignored
+  - late `BOOK_NOT_FOUND` after `READY` is ignored
 
-### 3.6 Runtime fix complete
-- Fixed runtime error:
-  - `server.to is not a function`
-- Root cause:
-  - Socket.IO room API was used while project runs with plain `ws` adapter.
-- Fix:
-  - `RobotGateway` now manually tracks request clients using `Map<string, Set<WebSocket>>`.
-  - Existing general/chat `SocketGateway` was not changed.
+## 4. Build verification
+- `npm run build` passes after Phase 4/5/6 implementation and follow-up fixes.
 
-## 4. Build status
-- `npm run build` passes after Phase 4/5/6 implementation and runtime fix.
+## 5. Completed runtime tests (confirmed)
+- Local MQTT broker connection works.
+- Backend subscribed to:
+  - `robot/robot_01/status`
+  - `robot/robot_01/pose`
+- MQTT status messages were received and parsed successfully.
+- Normal BORROW telemetry flow validated:
+  - `ASSIGNED`
+  - `NAVIGATING_TO_SHELF`
+  - `ARRIVED_AT_SHELF`
+  - `VERIFYING_BOOK`
+  - `BOOK_FOUND`
+  - `PICKING_UP`
+  - `DELIVERING`
+  - `ARRIVED_AT_STUDENT`
+  - `READY`
+- `Request.status` reached `READY`.
+- `Request.timeline` sequence remained stable without duplicate `READY` entries after fix.
+- `READY` remained `READY` after waiting more than 35 seconds.
+- Robot released correctly after `READY`:
+  - `Robot.status = IDLE`
+  - `Robot.currentRequestId = null`
+  - `Robot.isOnline = true`
+- Pose telemetry path confirmed and `Robot.currentPose` update verified.
+- WebSocket adapter mismatch was fixed (`server.to is not a function` removed by plain-ws room mapping).
 
-## 5. Runtime testing status
-- Confirmed so far:
-  - MQTT broker connection works when local broker is running.
-  - MQTT subscription confirmed for `robot_01`:
-    - `robot/robot_01/status`
-    - `robot/robot_01/pose`
-  - MQTT status message was received and parsed.
-  - WebSocket adapter mismatch was identified and fixed.
-- Not overclaimed: full telemetry-to-request lifecycle runtime validation is still in progress.
-
-## 6. Next runtime tests (Phase 4–6 validation)
-- Resend MQTT status and confirm no `server.to` error.
-- Verify `Request` timeline/status updates.
-- Verify `Robot` pose/status updates.
-- Verify `BOOK_NOT_FOUND` flow end-to-end.
-- Verify offline timeout flow.
-- Verify WebSocket client `joinRequest` behavior.
+## 6. Remaining runtime tests
+- `BOOK_NOT_FOUND` final verification:
+  - request should become `FAILED`
+  - request error should be set
+  - robot should be released
+  - inventory reservation should be released
+- Offline timeout final verification after latest fixes:
+  - in-progress request should fail only when robot stops before `READY`
+  - `READY` request should not fail
+- WebSocket client verification:
+  - client joins `joinRequest`
+  - client receives `robotPosition`, `robotStatus`, `requestUpdated`, `deliveryReady`
 
 ## 7. Next project steps
-- Finish Phase 4–6 runtime verification listed above.
-- Then move to Phase 7: staff/admin dashboard operations.
-- Later product/demo steps:
-  - richer demo data
-  - frontend book list/detail
-  - borrow/purchase buttons
-  - request status/history
-  - robot tracking UI
-  - community Twit feed/profile/comments
+1. Finish remaining runtime tests:
+- `BOOK_NOT_FOUND`
+- offline timeout before `READY`
+- WebSocket client `joinRequest` + event reception
+2. Move to Phase 7:
+- staff/admin dashboard operations
+3. Later:
+- richer demo data
+- frontend book list/detail
+- borrow/purchase buttons
+- request status/history
+- robot tracking UI
+- community Twit feed/profile/comments
 
 ## 8. Current important IDs from test data
 - Book ID: `69f662844d9e6330d4a5faa9`
