@@ -40,10 +40,11 @@ export class FollowResolver {
 	public async getFollowing(
 		@Args('memberId') targetId: string,
 		@Args('input') input: FollowInquiry,
+		@AuthMember('_id') viewerId: ObjectId,
 	): Promise<Followings> {
 		console.log('Query: getFollowing');
 		const memberId = shapeIntoMongoObjectId(targetId);
-		return await this.followService.getFollowing(memberId, input);
+		return await this.followService.getFollowing(memberId, viewerId, input);
 	}
 
 	@UseGuards(WithoutGuard)
@@ -51,10 +52,11 @@ export class FollowResolver {
 	public async getFollowers(
 		@Args('memberId') targetId: string,
 		@Args('input') input: FollowInquiry,
+		@AuthMember('_id') viewerId: ObjectId,
 	): Promise<Followers> {
 		console.log('Query: getFollowers');
 		const memberId = shapeIntoMongoObjectId(targetId);
-		return await this.followService.getFollowers(memberId, input);
+		return await this.followService.getFollowers(memberId, viewerId, input);
 	}
 
 	@UseGuards(AuthGuard)

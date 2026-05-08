@@ -31,6 +31,9 @@ export class Follower {
 	@Field(() => Date)
 	updatedAt: Date;
 
+	@Field(() => [MeFollowed], { nullable: true })
+	meFollowed?: MeFollowed[];
+
 	@Field(() => Member, { nullable: true })
 	followerData?: Member;
 }
@@ -51,6 +54,9 @@ export class Following {
 
 	@Field(() => Date)
 	updatedAt: Date;
+
+	@Field(() => [MeFollowed], { nullable: true })
+	meFollowed?: MeFollowed[];
 
 	@Field(() => Member, { nullable: true })
 	followingData?: Member;
