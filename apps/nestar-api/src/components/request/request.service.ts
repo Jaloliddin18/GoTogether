@@ -41,6 +41,10 @@ import {
 	BookInventoryType,
 } from '../../libs/enums/book-inventory.enum';
 import { MqttRobotService } from '../../robot-comm/mqtt.service';
+import {
+	MqttCancelCommandPayload,
+	MqttCommandPayload,
+} from '../../robot-comm/mqtt.types';
 
 @Injectable()
 export class RequestService {
@@ -165,6 +169,10 @@ export class RequestService {
 					)
 					.exec();
 				this.mqttRobotService.subscribeToRobotTopics(robot.robotId);
+				this.mqttRobotService.publishCommand(
+					robot.robotId,
+					this.buildDeliveryCommandPayload(book, reservedInventory, created),
+				);
 			}
 
 			return created;
@@ -394,7 +402,18 @@ export class RequestService {
 		await this.releaseInventoryReservation(target.sourceInventoryId);
 
 		if (target.robotId) {
+			const robot = await this.robotModel
+				.findOne({ _id: target.robotId })
+				.lean()
+				.exec();
 			await this.releaseRobot(target.robotId);
+			if (robot?.robotId) {
+				const cancelPayload: MqttCancelCommandPayload = {
+					type: 'CANCEL_TASK',
+					requestId: String(target._id),
+				};
+				this.mqttRobotService.publishCommand(robot.robotId, cancelPayload);
+			}
 		}
 
 		return result;
@@ -587,5 +606,39 @@ export class RequestService {
 				{ new: true },
 			)
 			.exec();
+	}
+
+	private buildDeliveryCommandPayload(
+		book: Book,
+		reservedInventory: BookInventory,
+		request: RequestTask,
+	): MqttCommandPayload {
+		return {
+			type: 'DELIVERY_TASK',
+			requestId: String(request._id),
+			book: {
+				bookId: String(book._id),
+				title: book.bookTitle,
+				callNumber: book.bookCallNumber,
+			},
+			pickup: {
+				floorId: reservedInventory.bookLocation.floorId,
+				x: reservedInventory.bookLocation.x,
+				y: reservedInventory.bookLocation.y,
+				theta: reservedInventory.bookLocation.theta,
+				gripperOpenWidthCm: reservedInventory.bookPickup.gripperOpenWidthCm,
+				gripperCloseWidthCm: reservedInventory.bookPickup.gripperCloseWidthCm,
+				gripHoldSeconds: reservedInventory.bookPickup.gripHoldSeconds,
+				pickupDirection: reservedInventory.bookPickup.pickupDirection,
+			},
+			dropoff: {
+				seatId:
+					request.destinationDeskId ??
+					String(request.destinationType ?? DeliveryDestinationType.RECEPTION),
+				x: request.destination.x,
+				y: request.destination.y,
+				theta: request.destination.theta,
+			},
+		};
 	}
 }

@@ -1,5 +1,5 @@
 export interface MqttCommandPayload {
-	type: string;
+	type: 'DELIVERY_TASK';
 	requestId: string;
 	book: {
 		bookId: string;
@@ -22,6 +22,11 @@ export interface MqttCommandPayload {
 		y: number;
 		theta: number;
 	};
+}
+
+export interface MqttCancelCommandPayload {
+	type: 'CANCEL_TASK';
+	requestId: string;
 }
 
 export interface MqttStatusPayload {

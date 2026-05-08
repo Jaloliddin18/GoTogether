@@ -11,7 +11,12 @@ import { BookInventoryStatus } from '../libs/enums/book-inventory.enum';
 import { RequestErrorCode, RequestStatus } from '../libs/enums/request.enum';
 import { RobotStatus } from '../libs/enums/robot.enum';
 import { RobotGateway } from '../socket/robot.gateway';
-import { MqttCommandPayload, MqttPosePayload, MqttStatusPayload } from './mqtt.types';
+import {
+	MqttCancelCommandPayload,
+	MqttCommandPayload,
+	MqttPosePayload,
+	MqttStatusPayload,
+} from './mqtt.types';
 
 @Injectable()
 export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
@@ -97,7 +102,10 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		this.client = null;
 	}
 
-	publishCommand(robotId: string, payload: MqttCommandPayload): void {
+	publishCommand(
+		robotId: string,
+		payload: MqttCommandPayload | MqttCancelCommandPayload,
+	): void {
 		if (!this.client || !this.client.connected) {
 			this.logger.warn(
 				`MQTT client unavailable, skipping command publish for robotId=${robotId}`,
