@@ -94,25 +94,21 @@ const BookInventorySchema = new Schema(
 		},
 
 		bookPickup: {
-			mastHeightCm: {
+			gripperOpenWidthCm: {
 				type: Number,
 				required: true,
 			},
-			forkDepthCm: {
+			gripperCloseWidthCm: {
 				type: Number,
 				required: true,
 			},
-			gripWidthCm: {
+			gripHoldSeconds: {
 				type: Number,
-				default: 0,
+				default: 1,
 			},
-			requiresContainer: {
-				type: Boolean,
-				default: true,
-			},
-			containerId: {
+			pickupDirection: {
 				type: String,
-				default: '',
+				default: 'FRONT',
 			},
 		},
 

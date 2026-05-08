@@ -40,19 +40,16 @@ export class BookInventoryLocation {
 @ObjectType()
 export class BookInventoryPickup {
 	@Field(() => Number)
-	mastHeightCm: number;
+	gripperOpenWidthCm: number;
 
 	@Field(() => Number)
-	forkDepthCm: number;
+	gripperCloseWidthCm: number;
 
 	@Field(() => Number)
-	gripWidthCm: number;
+	gripHoldSeconds: number;
 
-	@Field(() => Boolean)
-	requiresContainer: boolean;
-
-	@Field(() => String, { nullable: true })
-	containerId?: string;
+	@Field(() => String)
+	pickupDirection: string;
 }
 
 @ObjectType()

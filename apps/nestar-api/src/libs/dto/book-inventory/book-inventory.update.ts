@@ -1,6 +1,5 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
 import {
-	IsBoolean,
 	IsNotEmpty,
 	IsNumber,
 	IsOptional,
@@ -61,27 +60,22 @@ class BookPickupUpdateInput {
 	@IsOptional()
 	@IsNumber()
 	@Field(() => Number, { nullable: true })
-	mastHeightCm?: number;
+	gripperOpenWidthCm?: number;
 
 	@IsOptional()
 	@IsNumber()
 	@Field(() => Number, { nullable: true })
-	forkDepthCm?: number;
+	gripperCloseWidthCm?: number;
 
 	@IsOptional()
 	@IsNumber()
 	@Field(() => Number, { nullable: true })
-	gripWidthCm?: number;
-
-	@IsOptional()
-	@IsBoolean()
-	@Field(() => Boolean, { nullable: true })
-	requiresContainer?: boolean;
+	gripHoldSeconds?: number;
 
 	@IsOptional()
 	@IsString()
 	@Field(() => String, { nullable: true })
-	containerId?: string;
+	pickupDirection?: string;
 }
 
 @InputType()

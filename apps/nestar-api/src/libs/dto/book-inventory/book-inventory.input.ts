@@ -66,26 +66,22 @@ export class BookInventoryPickupInput {
 	@IsNotEmpty()
 	@IsNumber()
 	@Field(() => Number)
-	mastHeightCm: number;
+	gripperOpenWidthCm: number;
 
 	@IsNotEmpty()
 	@IsNumber()
 	@Field(() => Number)
-	forkDepthCm: number;
+	gripperCloseWidthCm: number;
 
 	@IsOptional()
 	@IsNumber()
 	@Field(() => Number, { nullable: true })
-	gripWidthCm?: number;
-
-	@IsOptional()
-	@Field(() => Boolean, { nullable: true })
-	requiresContainer?: boolean;
+	gripHoldSeconds?: number;
 
 	@IsOptional()
 	@IsString()
 	@Field(() => String, { nullable: true })
-	containerId?: string;
+	pickupDirection?: string;
 }
 
 @InputType()

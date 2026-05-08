@@ -24,6 +24,7 @@
 - PURCHASE completion tested in Postman.
 - Request error DTO nullability fixed.
 - Book schema nested required syntax fixed.
+- BookInventory pickup fields switched to fixed gripper settings.
 
 ## 4. Important behavior confirmed in Postman
 - createBook works.
