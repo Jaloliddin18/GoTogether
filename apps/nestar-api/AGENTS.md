@@ -37,8 +37,10 @@ Fields:
 - `location.x`
 - `location.y`
 - `location.theta`
-- `pickup.mastHeightCm`
-- `pickup.forkDepthCm`
+- `pickup.gripperOpenWidthCm`
+- `pickup.gripperCloseWidthCm`
+- `pickup.gripHoldSeconds`
+- `pickup.pickupDirection`
 
 BookStatus:
 - `AVAILABLE`
@@ -102,4 +104,3 @@ RequestStatus:
 - `COMPLETED`
 - `FAILED`
 - `CANCELLED`
-

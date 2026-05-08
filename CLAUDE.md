@@ -14,8 +14,8 @@ apps/nestar-api/         ← main API app (your workspace)
   src/
     components/          ← domain modules: book, robot, request (and legacy: member, property)
     schemas/             ← Mongoose schemas
-    socket/              ← WebSocket gateways
-    robot-comm/          ← MQTT module (does NOT exist yet — Phase 4)
+    socket/              ← WebSocket gateways (general + robot)
+    robot-comm/          ← MQTT module (implemented)
     libs/dto/            ← shared DTOs and input types
 apps/nestar-batch/       ← batch jobs — DO NOT TOUCH unless explicitly asked
 uploads/                 ← runtime upload storage
@@ -28,8 +28,8 @@ uploads/                 ← runtime upload storage
 - **GraphQL-first** — all app data operations use GraphQL (Apollo). No REST controllers.
 - **MongoDB + Mongoose** (MongoDB Atlas)
 - **JWT auth**, roles: `USER`, `ADMIN` (`AGENT` role already removed)
-- **Socket.io** — existing general gateway exists; robot tracking needs its own dedicated gateway
-- **MQTT** via `mqtt.js` — NOT yet implemented (Phase 4 next)
+- **WebSocket (`ws`)** — app uses `@nestjs/platform-ws` adapter
+- **MQTT** via `mqtt.js` — backend robot communication implemented
 - No frontend in this repo
 
 ---
@@ -67,11 +67,11 @@ resolver/service/module/DTO pattern before writing new code.
 
 ---
 
-## What Does NOT Exist Yet (Your Job)
-- Phase 4: `src/robot-comm/` — MQTT module (connect, publish commands, subscribe to telemetry)
-- Phase 5: `src/socket/robot.gateway.ts` — dedicated robot WebSocket gateway
-- Phase 6: MQTT telemetry → MongoDB update → WebSocket emit pipeline
-- Phase 7: Staff dashboard GraphQL operations
+## Current Delivery Status
+- Phase 4 complete: MQTT module (`src/robot-comm/`)
+- Phase 5 complete: dedicated robot gateway (`src/socket/robot.gateway.ts`)
+- Phase 6 complete: MQTT telemetry → MongoDB update → WebSocket emit integration
+- Phase 7 pending: staff/admin dashboard GraphQL operations
 
 ---
 
@@ -112,6 +112,7 @@ robot/{robotId}/event     ← robot PUBLISHES events BACK to backend
 ### WebSocket Events (frontend will depend on these)
 Gateway file: `apps/nestar-api/src/socket/robot.gateway.ts`
 Room model: clients join room `request:{requestId}`
+- Adapter reality: this project uses plain `ws`, so request-scoped targeting is implemented via manual client-room mapping (not Socket.IO rooms).
 
 **Client → server:**
 - `joinRequest` — payload: `{ requestId }`
@@ -178,3 +179,16 @@ JWT_SECRET=
 - Book image uploads still use `uploads/property` path — should be `uploads/book` (not urgent)
 - `Request.error` returns object with null fields on success — acceptable for now
 - `apps/nestar-batch` may still contain old property/agent logic — not handled yet
+
+## Recent Backend Completion Notes
+- BookInventory pickup refactor is complete:
+  - removed old pickup fields (`mastHeightCm`, `forkDepthCm`, `gripWidthCm`, `requiresContainer`, `containerId`)
+  - fixed-gripper fields now used (`gripperOpenWidthCm`, `gripperCloseWidthCm`, `gripHoldSeconds`, `pickupDirection`)
+  - mechanism is fixed gripper only (no fork lift, no moving arm)
+- Request hardening updates are complete:
+  - terminal guards in `cancelRequest` and `updateRequestStatus`
+  - `createDeliveryRequest` validates `bookCallNumber` before reservation/dispatch path
+- Phase 6 runtime behavior implemented:
+  - pose/status telemetry updates Robot + active Request data
+  - `BOOK_NOT_FOUND` and offline timeout paths fail request safely and release robot/inventory
+  - request-scoped WebSocket emits for status/pose/ready/failure events

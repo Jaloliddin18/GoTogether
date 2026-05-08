@@ -1,70 +1,157 @@
 # Backend Progress Context
 
 ## 1. Project direction
-- This project is no longer real estate/Nestar Property.
-- It is now a Smart Library/bookstore robot delivery system.
-- Students can BORROW a library book delivered to their desk.
-- Students can PURCHASE a commercial book delivered to reception.
+- This project is now a Smart Library/bookstore robot delivery backend (not real-estate/Nestar Property).
+- Students can BORROW library books to desk delivery.
+- Students can PURCHASE commercial books to reception pickup.
 
 ## 2. Current backend domain model
-- Book = catalog/product/bookstore data.
-- BookInventory = physical stock source and robot pickup information.
-- Robot = robot state and availability.
-- Request = borrow/purchase delivery order.
+- Book = catalog/product data.
+- BookInventory = physical stock + pickup location/mechanism.
+- Robot = robot identity/state/pose.
+- Request = borrow/purchase delivery task.
 
-## 3. Completed backend work
-- AGENT role removed from API.
-- Property API replaced by Book API.
-- Book module supports catalog/book fields.
-- BookInventory module added.
-- Request module refactored to use BookInventory.
-- BORROW flow tested in Postman.
-- CANCEL request tested in Postman.
-- PURCHASE flow tested in Postman.
-- PURCHASE completion tested in Postman.
-- Request error DTO nullability fixed.
-- Book schema nested required syntax fixed.
-- BookInventory pickup fields switched to fixed gripper settings.
+## 3. Completed implementation
 
-## 4. Important behavior confirmed in Postman
-- createBook works.
-- createBookInventory works for LIBRARY and COMMERCIAL.
-- createRobot works.
-- BORROW request selects LIBRARY inventory and assigns robot.
-- cancelRequest releases request/robot/inventory.
-- PURCHASE request selects COMMERCIAL inventory and sends to RECEPTION.
-- Completing PURCHASE changes paymentStatus to PAID.
-- Completing PURCHASE increases bookSoldQuantity and releases robot to IDLE.
+### 3.1 BookInventory pickup refactor (fixed gripper)
+- Removed old pickup fields:
+  - `mastHeightCm`
+  - `forkDepthCm`
+  - `gripWidthCm`
+  - `requiresContainer`
+  - `containerId`
+- Added fixed-gripper fields:
+  - `gripperOpenWidthCm`
+  - `gripperCloseWidthCm`
+  - `gripHoldSeconds`
+  - `pickupDirection`
+- Robot pickup model is fixed gripper only:
+  - no fork lift
+  - no moving arm
+  - gripper open/close only
+  - robot base drives to pickup coordinate and aligns by `pickupDirection`
+- Demo uses one floor, but `floorId` remains in `bookLocation` for multi-floor compatibility.
 
-## 5. Current important IDs from test data
+### 3.2 Request hardening fixes
+- `cancelRequest` now blocks terminal requests:
+  - `COMPLETED`
+  - `FAILED`
+  - `CANCELLED`
+- `updateRequestStatus` guards terminal requests from duplicate updates.
+- `createDeliveryRequest` validates `book.bookCallNumber` before inventory reservation because MQTT command payload requires `callNumber`.
+
+### 3.3 Phase 4 complete — MQTT robot communication module
+- Added:
+  - `apps/nestar-api/src/robot-comm/mqtt.types.ts`
+  - `apps/nestar-api/src/robot-comm/mqtt.service.ts`
+  - `apps/nestar-api/src/robot-comm/mqtt.module.ts`
+- Registered `MqttRobotModule` in `AppModule`.
+- Added `mqtt` dependency.
+- `MQTT_BROKER_URL` controls broker connection.
+- Missing `MQTT_BROKER_URL` logs warning and disables robot comm safely (no app crash).
+- MQTT publish topic:
+  - `robot/{robotId}/command`
+- MQTT subscribe topics:
+  - `robot/{robotId}/status`
+  - `robot/{robotId}/pose`
+
+### 3.4 Phase 5 complete — dedicated robot gateway
+- Added gateway file:
+  - `apps/nestar-api/src/socket/robot.gateway.ts`
+- Registered `RobotGateway` in `SocketModule`.
+- Kept robot gateway separate from existing general/chat `SocketGateway`.
+- This backend uses plain `ws` adapter (not Socket.IO).
+- Robot gateway uses manual request-scoped room mapping:
+  - `request:{requestId}`
+- Client event:
+  - `joinRequest`
+- Server events:
+  - `robotPosition`
+  - `robotStatus`
+  - `requestUpdated`
+  - `robotOffline`
+  - `bookNotFound`
+  - `deliveryReady`
+
+### 3.5 Phase 6 complete — MQTT telemetry to MongoDB + WebSocket
+- Scope:
+  - `apps/nestar-api/src/robot-comm/mqtt.service.ts`
+  - `apps/nestar-api/src/robot-comm/mqtt.module.ts`
+- Pose telemetry updates:
+  - `Robot.currentPose`
+  - `Robot.lastSeenAt`
+  - `Robot.isOnline`
+- Status telemetry updates:
+  - `Robot.status` when state maps to `RobotStatus`
+  - `Robot.battery`
+  - `Robot.lastSeenAt`
+  - `Robot.isOnline`
+  - active `Request.status` when state maps to `RequestStatus`
+  - `Request.timeline`
+- WebSocket emissions are request-scoped (`request:{requestId}`).
+- `BOOK_NOT_FOUND` handling:
+  - request marked `FAILED`
+  - request error set
+  - robot released to `IDLE`
+  - inventory reservation released
+  - `bookNotFound` + `requestUpdated` emitted
+- `READY` handling:
+  - `deliveryReady` emitted
+- Offline timeout handling:
+  - 30s timeout after last valid telemetry
+  - robot marked offline
+  - request marked `FAILED`
+  - inventory reservation released
+  - `robotOffline` + `requestUpdated` emitted
+
+### 3.6 Runtime fix complete
+- Fixed runtime error:
+  - `server.to is not a function`
+- Root cause:
+  - Socket.IO room API was used while project runs with plain `ws` adapter.
+- Fix:
+  - `RobotGateway` now manually tracks request clients using `Map<string, Set<WebSocket>>`.
+  - Existing general/chat `SocketGateway` was not changed.
+
+## 4. Build status
+- `npm run build` passes after Phase 4/5/6 implementation and runtime fix.
+
+## 5. Runtime testing status
+- Confirmed so far:
+  - MQTT broker connection works when local broker is running.
+  - MQTT subscription confirmed for `robot_01`:
+    - `robot/robot_01/status`
+    - `robot/robot_01/pose`
+  - MQTT status message was received and parsed.
+  - WebSocket adapter mismatch was identified and fixed.
+- Not overclaimed: full telemetry-to-request lifecycle runtime validation is still in progress.
+
+## 6. Next runtime tests (Phase 4–6 validation)
+- Resend MQTT status and confirm no `server.to` error.
+- Verify `Request` timeline/status updates.
+- Verify `Robot` pose/status updates.
+- Verify `BOOK_NOT_FOUND` flow end-to-end.
+- Verify offline timeout flow.
+- Verify WebSocket client `joinRequest` behavior.
+
+## 7. Next project steps
+- Finish Phase 4–6 runtime verification listed above.
+- Then move to Phase 7: staff/admin dashboard operations.
+- Later product/demo steps:
+  - richer demo data
+  - frontend book list/detail
+  - borrow/purchase buttons
+  - request status/history
+  - robot tracking UI
+  - community Twit feed/profile/comments
+
+## 8. Current important IDs from test data
 - Book ID: `69f662844d9e6330d4a5faa9`
 - LIBRARY inventory ID: `69f664874d9e6330d4a5faae`
 - COMMERCIAL inventory ID: `69f664b04d9e6330d4a5fab2`
 - Robot ID: `69f6670e997c6e5d143bd0d5`
 - robotId string: `robot_01`
 
-## 6. Current known issue / cleanup
-- Uploaded book images still use old `uploads/property` path. Later change to `uploads/book` or `uploads/books`.
-- Request error currently returns object with null fields for successful requests; acceptable for now, but cleaner would be `error: null`.
-- Need to confirm remaining uncommitted files if any:
-- `apps/nestar-api/src/components/robot/robot.service.ts`
-- `apps/nestar-api/src/libs/dto/book/book.ts`
-- `apps/nestar-batch` may still contain old property/agent batch logic; not handled yet.
-
-## 7. Next session plan
-- First run `git status` and `git log --oneline -8`.
-- Commit any remaining intentional changes if needed.
-- Test BORROW completion.
-- Create BORROW request.
-- Update status to COMPLETED.
-- Verify `bookReservedQuantity` decreases.
-- Verify `bookBorrowedQuantity` increases.
-- Verify robot returns to IDLE.
-- Test no-stock case.
-- Fix upload path from `uploads/property` to `uploads/book`.
-- Create more demo books/inventories.
-- Then start frontend book list/detail/request flow.
-
-## 8. Commit message rule
+## 9. Commit message rule
 - Only use `feat:` or `fix:`.
-- Do not use `docs:`, `refactor:`, `chore:`, `test:`, or any other prefix.
+- Do not use `docs:`, `refactor:`, `chore:`, `test:`, or other prefixes.
