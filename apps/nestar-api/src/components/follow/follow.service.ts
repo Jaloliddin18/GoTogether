@@ -15,12 +15,7 @@ import { MemberService } from '../member/member.service';
 import { Direction, Message } from '../../libs/enums/common.enum';
 import { FollowInquiry } from '../../libs/dto/follow/follow.input';
 import { T } from '../../libs/types/common';
-import {
-	lookupAuthMemberFollowed,
-	lookupAuthMemberLiked,
-	lookupFollowerData,
-	lookupFollowingData,
-} from '../../libs/config';
+import { lookupFollowerData, lookupFollowingData } from '../../libs/config';
 
 @Injectable()
 export class FollowService {
@@ -30,41 +25,27 @@ export class FollowService {
 		private readonly memberService: MemberService,
 	) {}
 
-	public async subscirbe(
+	public async followMember(
 		followerId: ObjectId,
 		followingId: ObjectId,
 	): Promise<Follower> {
 		if (followerId.toString() === followingId.toString())
 			throw new InternalServerErrorException(Message.SELF_SUBSCRIPTION_DENIED);
 
-		const targetMember = await this.memberService.getMember(null, followingId);
-		if (!targetMember)
-			throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+		await this.memberService.getMember(null, followingId);
+		const existing = await this.followModel
+			.findOne({ followerId, followingId })
+			.exec();
+		if (existing) return existing as Follower;
 
-		const result = await this.registerSubscription(followerId, followingId);
-
-		await this.memberService.memberStatsEditor({
-			_id: followerId,
-			targetKey: 'memberFollowings',
-			modifier: 1,
-		});
-
-		await this.memberService.memberStatsEditor({
-			_id: followingId,
-			targetKey: 'memberFollowers',
-			modifier: 1,
-		});
-
-		return result;
+		return await this.registerFollow(followerId, followingId);
 	}
 
-	public async unsubscirbe(
+	public async unfollowMember(
 		followerId: ObjectId,
 		followingId: ObjectId,
 	): Promise<Follower> {
-		const targetMember = await this.memberService.getMember(null, followingId);
-		if (!targetMember)
-			throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+		await this.memberService.getMember(null, followingId);
 
 		const result = await this.followModel
 			.findOneAndDelete({
@@ -73,46 +54,39 @@ export class FollowService {
 			})
 			.exec();
 		if (!result) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
-
-		await this.memberService.memberStatsEditor({
-			_id: followerId,
-			targetKey: 'memberFollowings',
-			modifier: -1,
-		});
-
-		await this.memberService.memberStatsEditor({
-			_id: followingId,
-			targetKey: 'memberFollowers',
-			modifier: -1,
-		});
-
 		return result;
 	}
 
-	private async registerSubscription(
+	private async registerFollow(
 		followerId: ObjectId,
 		followingId: ObjectId,
 	): Promise<Follower> {
 		try {
 			return await this.followModel.create({
-				followingId: followingId,
-				followerId: followerId,
+				followerId,
+				followingId,
 			});
 		} catch (err) {
-			console.log('Error, Service.model:', err.message);
+			const msg = err instanceof Error ? err.message : String(err);
+			console.log('Error, Service.model:', msg);
+			// duplicate follow can happen during concurrent requests: return existing row
+			if (msg.includes('E11000')) {
+				const existing = await this.followModel
+					.findOne({ followerId, followingId })
+					.exec();
+				if (existing) return existing as Follower;
+			}
 			throw new BadRequestException(Message.CREATE_FAILED);
 		}
 	}
 
-	public async getMemberFollowings(
-		memberId: ObjectId,
+	public async getFollowing(
+		targetMemberId: ObjectId,
 		input: FollowInquiry,
 	): Promise<Followings> {
-		const { page, limit, search } = input;
-		if (!search?.followerId)
-			throw new InternalServerErrorException(Message.BAD_REQUEST);
-		const match: T = { followerId: search?.followerId };
-		console.log('match:', match);
+		await this.memberService.getMember(null, targetMemberId);
+		const { page, limit } = input;
+		const match: T = { followerId: targetMemberId };
 
 		const result = await this.followModel
 			.aggregate([
@@ -121,13 +95,8 @@ export class FollowService {
 				{
 					$facet: {
 						list: [
-							{ $skip: (input.page - 1) * input.limit },
-							{ $limit: input.limit },
-							lookupAuthMemberLiked(memberId, '$followingId'),
-							lookupAuthMemberFollowed({
-								followerId: memberId,
-								followingId: '$followingId',
-							}),
+							{ $skip: (page - 1) * limit },
+							{ $limit: limit },
 							lookupFollowingData,
 							{ $unwind: '$followingData' },
 						],
@@ -136,21 +105,16 @@ export class FollowService {
 				},
 			])
 			.exec();
-		if (!result.length)
-			throw new InternalServerErrorException(Message.NO_DATA_FOUND);
-
 		return result[0];
 	}
 
-	public async getMemberFollowers(
-		memberId: ObjectId,
+	public async getFollowers(
+		targetMemberId: ObjectId,
 		input: FollowInquiry,
 	): Promise<Followers> {
-		const { page, limit, search } = input;
-		if (!search?.followingId)
-			throw new InternalServerErrorException(Message.BAD_REQUEST);
-		const match: T = { followingId: search?.followingId };
-		console.log('match:', match);
+		await this.memberService.getMember(null, targetMemberId);
+		const { page, limit } = input;
+		const match: T = { followingId: targetMemberId };
 
 		const result = await this.followModel
 			.aggregate([
@@ -159,13 +123,8 @@ export class FollowService {
 				{
 					$facet: {
 						list: [
-							{ $skip: (input.page - 1) * input.limit },
-							{ $limit: input.limit },
-							lookupAuthMemberLiked(memberId, 'followerId'),
-							lookupAuthMemberFollowed({
-								followerId: memberId,
-								followingId: '$followerId',
-							}),
+							{ $skip: (page - 1) * limit },
+							{ $limit: limit },
 							lookupFollowerData,
 							{ $unwind: '$followerData' },
 						],
@@ -174,9 +133,17 @@ export class FollowService {
 				},
 			])
 			.exec();
-		if (!result.length)
-			throw new InternalServerErrorException(Message.NO_DATA_FOUND);
-
 		return result[0];
+	}
+
+	public async checkFollowing(
+		followerId: ObjectId,
+		followingId: ObjectId,
+	): Promise<boolean> {
+		await this.memberService.getMember(null, followingId);
+		const existing = await this.followModel
+			.findOne({ followerId, followingId })
+			.exec();
+		return !!existing;
 	}
 }

@@ -15,47 +15,56 @@ export class FollowResolver {
 
 	@UseGuards(AuthGuard)
 	@Mutation(() => Follower)
-	public async subscribe(
-		@Args('input') input: string,
+	public async followMember(
+		@Args('memberId') input: string,
 		@AuthMember('_id') memberId: ObjectId,
 	): Promise<Follower> {
-		console.log('Mutation: subscribe');
+		console.log('Mutation: followMember');
 		const followingId = shapeIntoMongoObjectId(input);
-		return await this.followService.subscirbe(memberId, followingId);
+		return await this.followService.followMember(memberId, followingId);
 	}
 
 	@UseGuards(AuthGuard)
 	@Mutation(() => Follower)
-	public async unsubscribe(
-		@Args('input') input: string,
+	public async unfollowMember(
+		@Args('memberId') input: string,
 		@AuthMember('_id') memberId: ObjectId,
 	): Promise<Follower> {
-		console.log('Mutation: unsubscribe');
+		console.log('Mutation: unfollowMember');
 		const followingId = shapeIntoMongoObjectId(input);
-		return await this.followService.unsubscirbe(memberId, followingId);
+		return await this.followService.unfollowMember(memberId, followingId);
 	}
 
 	@UseGuards(WithoutGuard)
 	@Query(() => Followings)
-	public async getMemberFollowings(
+	public async getFollowing(
+		@Args('memberId') targetId: string,
 		@Args('input') input: FollowInquiry,
-		@AuthMember('_id') memberId: ObjectId,
 	): Promise<Followings> {
-		console.log('Query: getMemberFollowings');
-		const { followerId } = input.search;
-		input.search.followerId = shapeIntoMongoObjectId(followerId);
-		return await this.followService.getMemberFollowings(memberId, input);
+		console.log('Query: getFollowing');
+		const memberId = shapeIntoMongoObjectId(targetId);
+		return await this.followService.getFollowing(memberId, input);
 	}
 
 	@UseGuards(WithoutGuard)
 	@Query(() => Followers)
-	public async getMemberFollowers(
+	public async getFollowers(
+		@Args('memberId') targetId: string,
 		@Args('input') input: FollowInquiry,
-		@AuthMember('_id') memberId: ObjectId,
 	): Promise<Followers> {
-		console.log('Query: getMemberFollowers');
-		const { followingId } = input.search;
-		input.search.followingId = shapeIntoMongoObjectId(followingId);
-		return await this.followService.getMemberFollowers(memberId, input);
+		console.log('Query: getFollowers');
+		const memberId = shapeIntoMongoObjectId(targetId);
+		return await this.followService.getFollowers(memberId, input);
+	}
+
+	@UseGuards(AuthGuard)
+	@Query(() => Boolean)
+	public async checkFollowing(
+		@Args('memberId') targetId: string,
+		@AuthMember('_id') memberId: ObjectId,
+	): Promise<boolean> {
+		console.log('Query: checkFollowing');
+		const followingId = shapeIntoMongoObjectId(targetId);
+		return await this.followService.checkFollowing(memberId, followingId);
 	}
 }
