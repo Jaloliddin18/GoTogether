@@ -10,6 +10,7 @@ import { BookModule } from './book/book.module';
 import { BookInventoryModule } from './book-inventory/book-inventory.module';
 import { RobotModule } from './robot/robot.module';
 import { RequestModule } from './request/request.module';
+import { TwitModule } from './twit/twit.module';
 
 @Module({
 		imports: [
@@ -24,6 +25,7 @@ import { RequestModule } from './request/request.module';
 		BookInventoryModule,
 		RobotModule,
 		RequestModule,
+		TwitModule,
 	],
 })
 export class ComponentsModule {}

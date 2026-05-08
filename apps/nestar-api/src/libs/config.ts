@@ -73,6 +73,11 @@ export const availabeBoardArticleSorts = [
 ];
 
 export const availableCommentSorts = ['createdAt', 'updatedAt'];
+export const availableTwitSorts = [
+	'createdAt',
+	'updatedAt',
+	'likeCount',
+];
 
 // IMAGE CONFIGURATION
 
