@@ -97,7 +97,7 @@ export class TwitCommentService {
 
 		const result = await this.twitCommentModel
 			.aggregate([
-				{ $match: { twitId } },
+				{ $match: { twitId, deletedAt: null } },
 				{ $sort: sort },
 				{
 					$facet: {
