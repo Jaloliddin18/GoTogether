@@ -268,13 +268,29 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			}
 
 			const requestId: string = String(activeRequest._id);
-			this.startOfflineTimeout(payloadRobotId, requestId);
+			if (activeRequest.status === RequestStatus.READY) {
+				this.clearOfflineTimeout(payloadRobotId);
+			} else {
+				this.startOfflineTimeout(payloadRobotId, requestId);
+			}
 
 			let currentRequest = activeRequest;
+			let requestStatusChanged = false;
 
 			if (!mappedRequestStatus) {
 				this.logger.warn(
 					`Unknown RequestStatus mapping for state=${payload.state}; skipping request status update`,
+				);
+			} else if (
+				activeRequest.status === RequestStatus.READY &&
+				mappedRequestStatus !== RequestStatus.READY
+			) {
+				this.logger.warn(
+					`Ignoring stale telemetry state=${payload.state} because requestId=${requestId} is already READY`,
+				);
+			} else if (activeRequest.status === mappedRequestStatus) {
+				this.logger.log(
+					`Duplicate telemetry state=${mappedRequestStatus} for requestId=${requestId}; skipping timeline append`,
 				);
 			} else {
 				const updatedRequest = await this.requestModel
@@ -296,6 +312,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 
 				if (updatedRequest) {
 					currentRequest = updatedRequest;
+					requestStatusChanged = true;
 					this.emitToRequestRoom(requestId, 'requestUpdated', {
 						requestId,
 						status: mappedRequestStatus,
@@ -323,6 +340,13 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			}
 
 			if (payload.state === RequestStatus.BOOK_NOT_FOUND) {
+				if (currentRequest.status === RequestStatus.READY) {
+					this.logger.warn(
+						`Ignoring BOOK_NOT_FOUND for requestId=${requestId} because request is already READY`,
+					);
+					return;
+				}
+
 				this.emitToRequestRoom(requestId, 'bookNotFound', {
 					requestId,
 					bookId: String(currentRequest.bookId),
@@ -359,6 +383,12 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 					timestamp: payload.timestamp,
 				});
 				this.clearOfflineTimeout(payloadRobotId);
+				await this.releaseRobotAfterReady(robot._id);
+				if (!requestStatusChanged && activeRequest.status !== RequestStatus.READY) {
+					this.logger.warn(
+						`READY telemetry received but request status was not updated for requestId=${requestId}`,
+					);
+				}
 			}
 		} catch (error: unknown) {
 			const errorMessage =
@@ -677,6 +707,23 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 					$set: {
 						status: RobotStatus.IDLE,
 						currentRequestId: null,
+					},
+				},
+				{ new: true },
+			)
+			.exec();
+	}
+
+	private async releaseRobotAfterReady(robotObjectId: ObjectId): Promise<void> {
+		await this.robotModel
+			.findOneAndUpdate(
+				{ _id: robotObjectId },
+				{
+					$set: {
+						status: RobotStatus.IDLE,
+						currentRequestId: null,
+						isOnline: true,
+						lastSeenAt: new Date(),
 					},
 				},
 				{ new: true },
