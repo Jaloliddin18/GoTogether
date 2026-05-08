@@ -142,24 +142,24 @@
   - `Robot.isOnline = true`
 - Pose telemetry path confirmed and `Robot.currentPose` update verified.
 - WebSocket adapter mismatch was fixed (`server.to is not a function` removed by plain-ws room mapping).
+- `BOOK_NOT_FOUND` flow validated:
+  - request becomes `FAILED`
+  - `Request.error` is set
+  - robot is released
+  - inventory reservation is released
+- Offline timeout before `READY` validated:
+  - in-progress request becomes `FAILED` if robot stops sending telemetry
+  - robot is released
+  - robot is marked offline
+  - inventory reservation is released
 
 ## 6. Remaining runtime tests
-- `BOOK_NOT_FOUND` final verification:
-  - request should become `FAILED`
-  - request error should be set
-  - robot should be released
-  - inventory reservation should be released
-- Offline timeout final verification after latest fixes:
-  - in-progress request should fail only when robot stops before `READY`
-  - `READY` request should not fail
 - WebSocket client verification:
   - client joins `joinRequest`
   - client receives `robotPosition`, `robotStatus`, `requestUpdated`, `deliveryReady`
 
 ## 7. Next project steps
 1. Finish remaining runtime tests:
-- `BOOK_NOT_FOUND`
-- offline timeout before `READY`
 - WebSocket client `joinRequest` + event reception
 2. Move to Phase 7:
 - staff/admin dashboard operations

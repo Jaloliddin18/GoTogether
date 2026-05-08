@@ -184,9 +184,17 @@ JWT_SECRET=
   - robot is released on `READY` (`IDLE`, `currentRequestId=null`, `isOnline=true`)
   - pose telemetry path updates Robot pose data
   - previous `server.to is not a function` adapter mismatch is fixed
+  - `BOOK_NOT_FOUND` flow works:
+    - request becomes `FAILED`
+    - request error is set
+    - robot is released
+    - inventory reservation is released
+  - offline timeout before `READY` works:
+    - in-progress request becomes `FAILED` if robot stops sending telemetry
+    - robot is released
+    - robot is marked offline
+    - inventory reservation is released
 - Still pending final runtime checks:
-  - final `BOOK_NOT_FOUND` flow verification
-  - final pre-READY offline-timeout verification
   - WebSocket client-side join/receive verification for `joinRequest` + robot events
 
 ---
