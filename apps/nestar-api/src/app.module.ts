@@ -9,6 +9,7 @@ import { ComponentsModule } from './components/components.module';
 import { DatabaseModule } from './database/database.module';
 import { T } from './libs/types/common';
 import { SocketModule } from './socket/socket.module';
+import { MqttRobotModule } from './robot-comm/mqtt.module';
 
 @Module({
 	imports: [
@@ -31,6 +32,7 @@ import { SocketModule } from './socket/socket.module';
 		ComponentsModule,
 		DatabaseModule,
 		SocketModule,
+		MqttRobotModule,
 	],
 	controllers: [AppController], // rest API server
 	providers: [AppService, AppResolver], // graphQL API server
