@@ -54,7 +54,7 @@ const MemberSchema = new Schema(
 			type: Number,
 			default: 0,
 		},
-		memberArticles: {
+		memberTwits: {
 			type: Number,
 			default: 0,
 		},
