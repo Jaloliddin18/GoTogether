@@ -111,3 +111,21 @@ export class Members {
 	@Field(() => [TotalCounter], { nullable: true })
 	metaCounter: TotalCounter[];
 }
+
+@ObjectType()
+export class MemberProfile {
+	@Field(() => Member)
+	member: Member;
+
+	@Field(() => Int)
+	twitCount: number;
+
+	@Field(() => Int)
+	followerCount: number;
+
+	@Field(() => Int)
+	followingCount: number;
+
+	@Field(() => Boolean)
+	isFollowing: boolean;
+}

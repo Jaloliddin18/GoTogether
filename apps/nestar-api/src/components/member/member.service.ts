@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, ObjectId } from 'mongoose';
-import { Member, Members } from '../../libs/dto/member/member';
+import { Member, MemberProfile, Members } from '../../libs/dto/member/member';
 import {
 	LoginInput,
 	MemberInput,
@@ -23,12 +23,18 @@ import { LikeGroup } from '../../libs/enums/like.enum';
 import { LikeService } from '../like/like.service';
 import { Follower, Following, MeFollowed } from '../../libs/dto/follow/follow';
 
+interface TwitCounterDoc {
+	memberId: ObjectId;
+	deletedAt?: Date | null;
+}
+
 @Injectable()
 export class MemberService {
 	constructor(
 		@InjectModel('Member') private readonly memberModel: Model<Member>,
 		@InjectModel('Follow')
 		private readonly followModel: Model<Follower | Following>,
+		@InjectModel('Twit') private readonly twitModel: Model<TwitCounterDoc>,
 		private readonly authService: AuthService,
 		private readonly viewService: ViewService,
 		private readonly likeService: LikeService,
@@ -140,6 +146,38 @@ export class MemberService {
 			);
 		}
 		return targetMember;
+	}
+
+	public async getMemberProfile(
+		memberId: ObjectId | null,
+		targetId: ObjectId,
+	): Promise<MemberProfile> {
+		const member: Member = await this.getMember(memberId, targetId);
+
+		const [twitCount, followerCount, followingCount] = await Promise.all([
+			this.twitModel.countDocuments({ memberId: targetId, deletedAt: null }).exec(),
+			this.followModel.countDocuments({ followingId: targetId }).exec(),
+			this.followModel.countDocuments({ followerId: targetId }).exec(),
+		]);
+
+		let isFollowing = false;
+		if (memberId && memberId.toString() !== targetId.toString()) {
+			const existing = await this.followModel
+				.findOne({
+					followerId: memberId,
+					followingId: targetId,
+				})
+				.exec();
+			isFollowing = !!existing;
+		}
+
+		return {
+			member,
+			twitCount,
+			followerCount,
+			followingCount,
+			isFollowing,
+		};
 	}
 
 	private async checkSubscription(
