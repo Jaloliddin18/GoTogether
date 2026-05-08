@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { InjectModel } from '@nestjs/mongoose';
 import { connect, MqttClient } from 'mqtt';
 import { Model, ObjectId } from 'mongoose';
+import { Server } from 'socket.io';
 import { shapeIntoMongoObjectId } from '../libs/config';
 import { BookInventory } from '../libs/dto/book-inventory/book-inventory';
 import { RequestTask } from '../libs/dto/request/request';
@@ -294,7 +295,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 
 				if (updatedRequest) {
 					currentRequest = updatedRequest;
-					this.robotGateway.emitRequestUpdated(requestId, {
+					this.emitToRequestRoom(requestId, 'requestUpdated', {
 						requestId,
 						status: mappedRequestStatus,
 						message: payload.message,
@@ -307,7 +308,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				}
 			}
 
-			this.robotGateway.emitRobotStatus(requestId, {
+			this.emitToRequestRoom(requestId, 'robotStatus', {
 				robotId: payloadRobotId,
 				requestId,
 				status: payload.state,
@@ -321,7 +322,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			}
 
 			if (payload.state === RequestStatus.BOOK_NOT_FOUND) {
-				this.robotGateway.emitBookNotFound(requestId, {
+				this.emitToRequestRoom(requestId, 'bookNotFound', {
 					requestId,
 					bookId: String(currentRequest.bookId),
 					message: payload.message,
@@ -340,7 +341,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				this.clearOfflineTimeout(payloadRobotId);
 
 				if (failedRequest) {
-					this.robotGateway.emitRequestUpdated(requestId, {
+					this.emitToRequestRoom(requestId, 'requestUpdated', {
 						requestId,
 						status: RequestStatus.FAILED,
 						message: payload.message || 'Book not found.',
@@ -351,7 +352,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			}
 
 			if (payload.state === RequestStatus.READY) {
-				this.robotGateway.emitDeliveryReady(requestId, {
+				this.emitToRequestRoom(requestId, 'deliveryReady', {
 					requestId,
 					message: payload.message ?? 'Your book is ready for pickup.',
 					timestamp: payload.timestamp,
@@ -420,7 +421,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			const requestId: string = String(activeRequest._id);
 			this.startOfflineTimeout(payloadRobotId, requestId);
 
-			this.robotGateway.emitRobotPosition(requestId, {
+			this.emitToRequestRoom(requestId, 'robotPosition', {
 				robotId: payloadRobotId,
 				requestId,
 				floorId: payload.floorId,
@@ -525,13 +526,13 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			await this.releaseInventoryReservation(request.sourceInventoryId);
 
 			const nowIso = new Date().toISOString();
-			this.robotGateway.emitRobotOffline(requestId, {
+			this.emitToRequestRoom(requestId, 'robotOffline', {
 				robotId,
 				requestId,
 				message: 'Robot connection lost.',
 				timestamp: nowIso,
 			});
-			this.robotGateway.emitRequestUpdated(requestId, {
+			this.emitToRequestRoom(requestId, 'requestUpdated', {
 				requestId,
 				status: RequestStatus.FAILED,
 				message: 'Robot connection lost.',
@@ -732,6 +733,20 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		const reserved = inventory.bookReservedQuantity ?? 0;
 		const borrowed = inventory.bookBorrowedQuantity ?? 0;
 		return total - sold - reserved - borrowed;
+	}
+
+	private emitToRequestRoom(
+		requestId: string,
+		event: string,
+		payload: Record<string, unknown>,
+	): void {
+		const server: Server | null = this.robotGateway.getServer();
+		if (!server) {
+			this.logger.warn('WebSocket server not ready');
+			return;
+		}
+
+		server.to(`request:${requestId}`).emit(event, payload);
 	}
 
 	private maskBrokerUrl(brokerUrl: string): string {

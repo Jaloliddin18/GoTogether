@@ -20,6 +20,11 @@ export class RobotGateway implements OnGatewayInit {
 
 	public afterInit(server: Server): void {
 		this.logger.verbose('Robot WebSocket Gateway Initialized');
+		this.logger.verbose(`Robot WebSocket server ready: ${Boolean(server)}`);
+	}
+
+	public getServer(): Server | null {
+		return this.server ?? null;
 	}
 
 	public handleConnection(client: Socket): void {
