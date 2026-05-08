@@ -1,5 +1,15 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
 import { connect, MqttClient } from 'mqtt';
+import { Model, ObjectId } from 'mongoose';
+import { shapeIntoMongoObjectId } from '../libs/config';
+import { BookInventory } from '../libs/dto/book-inventory/book-inventory';
+import { RequestTask } from '../libs/dto/request/request';
+import { Robot } from '../libs/dto/robot/robot';
+import { BookInventoryStatus } from '../libs/enums/book-inventory.enum';
+import { RequestErrorCode, RequestStatus } from '../libs/enums/request.enum';
+import { RobotStatus } from '../libs/enums/robot.enum';
+import { RobotGateway } from '../socket/robot.gateway';
 import { MqttCommandPayload, MqttPosePayload, MqttStatusPayload } from './mqtt.types';
 
 @Injectable()
@@ -7,6 +17,21 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger: Logger = new Logger(MqttRobotService.name);
 	private client: MqttClient | null = null;
 	private readonly subscribedRobotIds: Set<string> = new Set<string>();
+	private readonly offlineTimeouts: Map<string, ReturnType<typeof setTimeout>> =
+		new Map<string, ReturnType<typeof setTimeout>>();
+	private readonly terminalRequestStatuses: RequestStatus[] = [
+		RequestStatus.COMPLETED,
+		RequestStatus.FAILED,
+		RequestStatus.CANCELLED,
+	];
+
+	constructor(
+		private readonly robotGateway: RobotGateway,
+		@InjectModel('Robot') private readonly robotModel: Model<Robot>,
+		@InjectModel('Request') private readonly requestModel: Model<RequestTask>,
+		@InjectModel('BookInventory')
+		private readonly bookInventoryModel: Model<BookInventory>,
+	) {}
 
 	onModuleInit(): void {
 		const brokerUrl: string | undefined = process.env.MQTT_BROKER_URL;
@@ -23,8 +48,11 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				connectTimeout: 10000,
 			});
 		} catch (error: unknown) {
-			const errorMessage: string = error instanceof Error ? error.message : 'Unknown error';
-			this.logger.error(`Failed to initialize MQTT client (${maskedBrokerUrl}): ${errorMessage}`);
+			const errorMessage: string =
+				error instanceof Error ? error.message : 'Unknown error';
+			this.logger.error(
+				`Failed to initialize MQTT client (${maskedBrokerUrl}): ${errorMessage}`,
+			);
 			return;
 		}
 
@@ -34,7 +62,9 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		});
 
 		this.client.on('error', (error: Error) => {
-			this.logger.error(`MQTT connection error (${maskedBrokerUrl}): ${error.message}`);
+			this.logger.error(
+				`MQTT connection error (${maskedBrokerUrl}): ${error.message}`,
+			);
 		});
 
 		this.client.on('close', () => {
@@ -46,11 +76,16 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		});
 
 		this.client.on('message', (topic: string, message: Buffer) => {
-			this.handleIncomingMessage(topic, message.toString());
+			void this.handleIncomingMessage(topic, message.toString());
 		});
 	}
 
 	onModuleDestroy(): void {
+		for (const timeout of this.offlineTimeouts.values()) {
+			clearTimeout(timeout);
+		}
+		this.offlineTimeouts.clear();
+
 		if (!this.client) return;
 
 		this.client.end(false, {}, () => {
@@ -61,7 +96,9 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 
 	publishCommand(robotId: string, payload: MqttCommandPayload): void {
 		if (!this.client || !this.client.connected) {
-			this.logger.warn(`MQTT client unavailable, skipping command publish for robotId=${robotId}`);
+			this.logger.warn(
+				`MQTT client unavailable, skipping command publish for robotId=${robotId}`,
+			);
 			return;
 		}
 
@@ -70,10 +107,14 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 
 		this.client.publish(topic, encodedPayload, (error?: Error) => {
 			if (error) {
-				this.logger.error(`Failed to publish MQTT command topic=${topic} robotId=${robotId}: ${error.message}`);
+				this.logger.error(
+					`Failed to publish MQTT command topic=${topic} robotId=${robotId}: ${error.message}`,
+				);
 				return;
 			}
-			this.logger.log(`Published MQTT command topic=${topic} robotId=${robotId}`);
+			this.logger.log(
+				`Published MQTT command topic=${topic} robotId=${robotId}`,
+			);
 		});
 	}
 
@@ -91,7 +132,9 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		this.subscribedRobotIds.add(robotId);
 
 		if (!this.client || !this.client.connected) {
-			this.logger.warn(`MQTT client unavailable, deferred subscription for robotId=${robotId}`);
+			this.logger.warn(
+				`MQTT client unavailable, deferred subscription for robotId=${robotId}`,
+			);
 			return;
 		}
 
@@ -106,10 +149,14 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 
 		this.client.subscribe([statusTopic, poseTopic], (error?: Error) => {
 			if (error) {
-				this.logger.error(`Failed MQTT subscribe for robotId=${robotId}: ${error.message}`);
+				this.logger.error(
+					`Failed MQTT subscribe for robotId=${robotId}: ${error.message}`,
+				);
 				return;
 			}
-			this.logger.log(`Subscribed MQTT topics for robotId=${robotId}: ${statusTopic}, ${poseTopic}`);
+			this.logger.log(
+				`Subscribed MQTT topics for robotId=${robotId}: ${statusTopic}, ${poseTopic}`,
+			);
 		});
 	}
 
@@ -119,8 +166,13 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		}
 	}
 
-	private handleIncomingMessage(topic: string, rawMessage: string): void {
-		const topicMatch: RegExpMatchArray | null = topic.match(/^robot\/([^/]+)\/(status|pose)$/);
+	private async handleIncomingMessage(
+		topic: string,
+		rawMessage: string,
+	): Promise<void> {
+		const topicMatch: RegExpMatchArray | null = topic.match(
+			/^robot\/([^/]+)\/(status|pose)$/,
+		);
 		if (!topicMatch) {
 			this.logger.warn(`MQTT message received on unsupported topic=${topic}`);
 			return;
@@ -137,25 +189,536 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			return;
 		}
 
-		this.logger.log(`MQTT message received topic=${topic} payload=${JSON.stringify(parsedPayload)}`);
-
-		if (topicType === 'status') {
-			this.onStatusMessage(robotId, parsedPayload as MqttStatusPayload);
+		if (!parsedPayload || typeof parsedPayload !== 'object') {
+			this.logger.warn(`Invalid payload shape on topic=${topic}`);
 			return;
 		}
 
-		this.onPoseMessage(robotId, parsedPayload as MqttPosePayload);
+		this.logger.log(
+			`MQTT message received topic=${topic} payload=${JSON.stringify(parsedPayload)}`,
+		);
+
+		if (topicType === 'status') {
+			await this.onStatusMessage(robotId, parsedPayload as MqttStatusPayload);
+			return;
+		}
+
+		await this.onPoseMessage(robotId, parsedPayload as MqttPosePayload);
 	}
 
-	private onStatusMessage(robotId: string, payload: MqttStatusPayload): void {
-		this.logger.log(`STATUS from ${robotId}: ${payload.state} battery:${payload.battery}`);
-		// TODO: Phase 6 — update Robot and Request in MongoDB
+	private async onStatusMessage(
+		robotId: string,
+		payload: MqttStatusPayload,
+	): Promise<void> {
+		this.logger.log(
+			`STATUS from ${robotId}: ${payload.state} battery:${payload.battery}`,
+		);
+
+		try {
+			const payloadRobotId: string = payload?.robotId?.trim() || robotId;
+			if (payloadRobotId !== robotId) {
+				this.logger.warn(
+					`MQTT status robotId mismatch topic=${robotId} payload=${payloadRobotId}`,
+				);
+			}
+
+			const robot = await this.robotModel
+				.findOne({ robotId: payloadRobotId })
+				.exec();
+			if (!robot) {
+				this.logger.warn(
+					`Robot not found for MQTT status robotId=${payloadRobotId}`,
+				);
+				return;
+			}
+
+			const robotUpdate: Record<string, unknown> = {
+				lastSeenAt: new Date(),
+				isOnline: true,
+			};
+
+			if (typeof payload.battery === 'number') {
+				robotUpdate.battery = payload.battery;
+			}
+
+			const mappedRobotStatus = this.mapToRobotStatus(payload.state);
+			if (mappedRobotStatus) {
+				robotUpdate.status = mappedRobotStatus;
+			} else {
+				this.logger.warn(
+					`Unknown RobotStatus state=${payload.state}; updating battery/online only for robotId=${payloadRobotId}`,
+				);
+			}
+
+			await this.robotModel
+				.findOneAndUpdate({ _id: robot._id }, { $set: robotUpdate }, { new: true })
+				.exec();
+
+			const activeRequest = await this.findActiveRequestByRobot(robot._id);
+			if (!activeRequest) {
+				this.logger.log(
+					`No active request for robotId=${payloadRobotId}; skipping robotStatus/request updates`,
+				);
+				return;
+			}
+
+			const requestId: string = String(activeRequest._id);
+			this.startOfflineTimeout(payloadRobotId, requestId);
+
+			const mappedRequestStatus = this.mapToRequestStatus(payload.state);
+			let currentRequest = activeRequest;
+
+			if (!mappedRequestStatus) {
+				this.logger.warn(
+					`Unknown RequestStatus mapping for state=${payload.state}; skipping request status update`,
+				);
+			} else {
+				const updatedRequest = await this.requestModel
+					.findOneAndUpdate(
+						{ _id: activeRequest._id },
+						{
+							$set: { status: mappedRequestStatus },
+							$push: {
+								timeline: this.buildTimelineItem(
+									mappedRequestStatus,
+									payload.message,
+									payload.timestamp,
+								),
+							},
+						},
+						{ new: true },
+					)
+					.exec();
+
+				if (updatedRequest) {
+					currentRequest = updatedRequest;
+					this.robotGateway.emitRequestUpdated(requestId, {
+						requestId,
+						status: mappedRequestStatus,
+						message: payload.message,
+						timestamp: payload.timestamp,
+					});
+
+					if (this.isTerminalRequestStatus(mappedRequestStatus)) {
+						this.clearOfflineTimeout(payloadRobotId);
+					}
+				}
+			}
+
+			this.robotGateway.emitRobotStatus(requestId, {
+				robotId: payloadRobotId,
+				requestId,
+				status: payload.state,
+				message: payload.message,
+				battery: payload.battery,
+				timestamp: payload.timestamp,
+			});
+
+			if (this.isTerminalRequestStatus(payload.state)) {
+				this.clearOfflineTimeout(payloadRobotId);
+			}
+
+			if (payload.state === RequestStatus.BOOK_NOT_FOUND) {
+				this.robotGateway.emitBookNotFound(requestId, {
+					requestId,
+					bookId: String(currentRequest.bookId),
+					message: payload.message,
+					timestamp: payload.timestamp,
+				});
+
+				const failedRequest = await this.failRequestAndRelease({
+					requestId: currentRequest._id,
+					sourceInventoryId: currentRequest.sourceInventoryId,
+					robotObjectId: robot._id,
+					errorCode: RequestErrorCode.BOOK_NOT_FOUND,
+					message: payload.message || 'Book not found.',
+					timestamp: payload.timestamp,
+				});
+
+				this.clearOfflineTimeout(payloadRobotId);
+
+				if (failedRequest) {
+					this.robotGateway.emitRequestUpdated(requestId, {
+						requestId,
+						status: RequestStatus.FAILED,
+						message: payload.message || 'Book not found.',
+						timestamp: payload.timestamp,
+					});
+				}
+				return;
+			}
+
+			if (payload.state === RequestStatus.READY) {
+				this.robotGateway.emitDeliveryReady(requestId, {
+					requestId,
+					message: payload.message ?? 'Your book is ready for pickup.',
+					timestamp: payload.timestamp,
+				});
+			}
+		} catch (error: unknown) {
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
+			this.logger.error(
+				`Failed handling MQTT status message for robotId=${robotId}: ${errorMessage}`,
+			);
+		}
 	}
 
-	private onPoseMessage(robotId: string, payload: MqttPosePayload): void {
-		this.logger.log(`POSE from ${robotId}: x:${payload.x} y:${payload.y} theta:${payload.theta}`);
-		// TODO: Phase 6 — update Robot.currentPose in MongoDB
-		// TODO: Phase 5 — emit robotPosition via WebSocket gateway
+	private async onPoseMessage(
+		robotId: string,
+		payload: MqttPosePayload,
+	): Promise<void> {
+		this.logger.log(
+			`POSE from ${robotId}: x:${payload.x} y:${payload.y} theta:${payload.theta}`,
+		);
+
+		try {
+			const payloadRobotId: string = payload?.robotId?.trim() || robotId;
+			if (payloadRobotId !== robotId) {
+				this.logger.warn(
+					`MQTT pose robotId mismatch topic=${robotId} payload=${payloadRobotId}`,
+				);
+			}
+
+			const robot = await this.robotModel
+				.findOne({ robotId: payloadRobotId })
+				.exec();
+			if (!robot) {
+				this.logger.warn(
+					`Robot not found for MQTT pose robotId=${payloadRobotId}`,
+				);
+				return;
+			}
+
+			await this.robotModel
+				.findOneAndUpdate(
+					{ _id: robot._id },
+					{
+						$set: {
+							'currentPose.floorId': payload.floorId,
+							'currentPose.x': payload.x,
+							'currentPose.y': payload.y,
+							'currentPose.theta': payload.theta,
+							lastSeenAt: new Date(),
+							isOnline: true,
+						},
+					},
+					{ new: true },
+				)
+				.exec();
+
+			const activeRequest = await this.findActiveRequestByRobot(robot._id);
+			if (!activeRequest) {
+				this.logger.log(
+					`No active request for robotId=${payloadRobotId}; skipping robotPosition emit`,
+				);
+				return;
+			}
+
+			const requestId: string = String(activeRequest._id);
+			this.startOfflineTimeout(payloadRobotId, requestId);
+
+			this.robotGateway.emitRobotPosition(requestId, {
+				robotId: payloadRobotId,
+				requestId,
+				floorId: payload.floorId,
+				x: payload.x,
+				y: payload.y,
+				theta: payload.theta,
+				timestamp: payload.timestamp,
+			});
+		} catch (error: unknown) {
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
+			this.logger.error(
+				`Failed handling MQTT pose message for robotId=${robotId}: ${errorMessage}`,
+			);
+		}
+	}
+
+	private startOfflineTimeout(robotId: string, requestId: string): void {
+		this.clearOfflineTimeout(robotId);
+		const timeout = setTimeout(() => {
+			void this.handleOfflineTimeout(robotId, requestId);
+		}, 30000);
+		this.offlineTimeouts.set(robotId, timeout);
+	}
+
+	private clearOfflineTimeout(robotId: string): void {
+		const timeout = this.offlineTimeouts.get(robotId);
+		if (!timeout) return;
+		clearTimeout(timeout);
+		this.offlineTimeouts.delete(robotId);
+	}
+
+	private async handleOfflineTimeout(
+		robotId: string,
+		requestId: string,
+	): Promise<void> {
+		this.offlineTimeouts.delete(robotId);
+
+		try {
+			const robot = await this.robotModel.findOne({ robotId }).exec();
+			if (!robot) {
+				this.logger.warn(
+					`Offline timeout fired but robot not found for robotId=${robotId}`,
+				);
+				return;
+			}
+
+			const request = await this.requestModel
+				.findOne({ _id: shapeIntoMongoObjectId(requestId) })
+				.exec();
+			if (!request) {
+				this.logger.warn(
+					`Offline timeout fired but request not found for requestId=${requestId}`,
+				);
+				return;
+			}
+
+			if (this.isTerminalRequestStatus(request.status)) {
+				return;
+			}
+
+			await this.robotModel
+				.findOneAndUpdate(
+					{ _id: robot._id },
+					{
+						$set: {
+							isOnline: false,
+							status: RobotStatus.IDLE,
+							currentRequestId: null,
+							lastSeenAt: new Date(),
+						},
+					},
+					{ new: true },
+				)
+				.exec();
+
+			const errorTimestamp = new Date();
+			await this.requestModel
+				.findOneAndUpdate(
+					{ _id: request._id },
+					{
+						$set: {
+							status: RequestStatus.FAILED,
+							error: {
+								code: RequestErrorCode.ROBOT_OFFLINE,
+								message: 'Robot connection lost.',
+								timestamp: errorTimestamp,
+							},
+						},
+						$push: {
+							timeline: {
+								status: RequestStatus.FAILED,
+								message: 'Robot connection lost.',
+								timestamp: errorTimestamp,
+							},
+						},
+					},
+					{ new: true },
+				)
+				.exec();
+
+			await this.releaseInventoryReservation(request.sourceInventoryId);
+
+			const nowIso = new Date().toISOString();
+			this.robotGateway.emitRobotOffline(requestId, {
+				robotId,
+				requestId,
+				message: 'Robot connection lost.',
+				timestamp: nowIso,
+			});
+			this.robotGateway.emitRequestUpdated(requestId, {
+				requestId,
+				status: RequestStatus.FAILED,
+				message: 'Robot connection lost.',
+				timestamp: nowIso,
+			});
+		} catch (error: unknown) {
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
+			this.logger.error(
+				`Offline timeout handling failed for robotId=${robotId}, requestId=${requestId}: ${errorMessage}`,
+			);
+		}
+	}
+
+	private async failRequestAndRelease(input: {
+		requestId: ObjectId;
+		sourceInventoryId: ObjectId;
+		robotObjectId: ObjectId;
+		errorCode: RequestErrorCode;
+		message: string;
+		timestamp?: string;
+	}): Promise<RequestTask | null> {
+		const failedAt = this.toValidDate(input.timestamp);
+		const failedRequest = await this.requestModel
+			.findOneAndUpdate(
+				{ _id: input.requestId },
+				{
+					$set: {
+						status: RequestStatus.FAILED,
+						error: {
+							code: input.errorCode,
+							message: input.message,
+							timestamp: failedAt,
+						},
+					},
+					$push: {
+						timeline: {
+							status: RequestStatus.FAILED,
+							message: input.message,
+							timestamp: failedAt,
+						},
+					},
+				},
+				{ new: true },
+			)
+			.exec();
+
+		await this.releaseInventoryReservation(input.sourceInventoryId);
+		await this.releaseRobot(input.robotObjectId);
+
+		return failedRequest;
+	}
+
+	private async findActiveRequestByRobot(
+		robotObjectId: ObjectId,
+	): Promise<RequestTask | null> {
+		return await this.requestModel
+			.findOne({
+				robotId: robotObjectId,
+				status: { $nin: this.terminalRequestStatuses },
+			})
+			.sort({ updatedAt: -1 })
+			.exec();
+	}
+
+	private isTerminalRequestStatus(status: RequestStatus | string): boolean {
+		return this.terminalRequestStatuses.includes(status as RequestStatus);
+	}
+
+	private mapToRobotStatus(state: string): RobotStatus | null {
+		const robotStatuses = Object.values(RobotStatus);
+		return robotStatuses.includes(state as RobotStatus)
+			? (state as RobotStatus)
+			: null;
+	}
+
+	private mapToRequestStatus(state: string): RequestStatus | null {
+		switch (state) {
+			case RequestStatus.NAVIGATING_TO_SHELF:
+				return RequestStatus.NAVIGATING_TO_SHELF;
+			case RequestStatus.ARRIVED_AT_SHELF:
+				return RequestStatus.ARRIVED_AT_SHELF;
+			case RequestStatus.VERIFYING_BOOK:
+				return RequestStatus.VERIFYING_BOOK;
+			case RequestStatus.BOOK_FOUND:
+				return RequestStatus.BOOK_FOUND;
+			case RequestStatus.BOOK_NOT_FOUND:
+				return RequestStatus.BOOK_NOT_FOUND;
+			case RequestStatus.PICKING_UP:
+				return RequestStatus.PICKING_UP;
+			case RequestStatus.DELIVERING:
+				return RequestStatus.DELIVERING;
+			case RequestStatus.ARRIVED_AT_STUDENT:
+				return RequestStatus.ARRIVED_AT_STUDENT;
+			case RequestStatus.READY:
+				return RequestStatus.READY;
+			default:
+				return null;
+		}
+	}
+
+	private buildTimelineItem(
+		status: RequestStatus,
+		message?: string,
+		timestamp?: string,
+	): { status: RequestStatus; message: string; timestamp: Date } {
+		return {
+			status,
+			message: message ?? '',
+			timestamp: this.toValidDate(timestamp),
+		};
+	}
+
+	private toValidDate(timestamp?: string): Date {
+		if (!timestamp) return new Date();
+		const parsed = new Date(timestamp);
+		if (Number.isNaN(parsed.getTime())) {
+			return new Date();
+		}
+		return parsed;
+	}
+
+	private async releaseRobot(robotObjectId: ObjectId): Promise<void> {
+		await this.robotModel
+			.findOneAndUpdate(
+				{ _id: robotObjectId },
+				{
+					$set: {
+						status: RobotStatus.IDLE,
+						currentRequestId: null,
+					},
+				},
+				{ new: true },
+			)
+			.exec();
+	}
+
+	private async releaseInventoryReservation(
+		sourceInventoryId: ObjectId,
+	): Promise<void> {
+		const updated = await this.bookInventoryModel
+			.findOneAndUpdate(
+				{
+					_id: sourceInventoryId,
+					deletedAt: null,
+					bookReservedQuantity: { $gt: 0 },
+				},
+				{ $inc: { bookReservedQuantity: -1 } },
+				{ new: true },
+			)
+			.exec();
+
+		if (updated) {
+			await this.syncInventoryStatusByAvailability(updated._id);
+		}
+	}
+
+	private async syncInventoryStatusByAvailability(
+		sourceInventoryId: ObjectId,
+	): Promise<void> {
+		const inventory = await this.bookInventoryModel
+			.findOne({ _id: sourceInventoryId, deletedAt: null })
+			.lean()
+			.exec();
+		if (!inventory) return;
+
+		const availableStock = this.calculateAvailableStock(inventory);
+		const nextStatus =
+			availableStock > 0
+				? BookInventoryStatus.AVAILABLE
+				: BookInventoryStatus.RESERVED;
+
+		if (inventory.bookInventoryStatus === nextStatus) return;
+
+		await this.bookInventoryModel
+			.findOneAndUpdate(
+				{ _id: sourceInventoryId },
+				{ $set: { bookInventoryStatus: nextStatus } },
+				{ new: true },
+			)
+			.exec();
+	}
+
+	private calculateAvailableStock(inventory: Partial<BookInventory>): number {
+		const total = inventory.bookTotalQuantity ?? 0;
+		const sold = inventory.bookSoldQuantity ?? 0;
+		const reserved = inventory.bookReservedQuantity ?? 0;
+		const borrowed = inventory.bookBorrowedQuantity ?? 0;
+		return total - sold - reserved - borrowed;
 	}
 
 	private maskBrokerUrl(brokerUrl: string): string {
