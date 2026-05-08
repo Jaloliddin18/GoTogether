@@ -94,7 +94,7 @@ robot/{robotId}/event     ← robot PUBLISHES events BACK to backend
   "type": "DELIVERY_TASK",
   "requestId": "...",
   "book": { "bookId": "...", "title": "...", "callNumber": "..." },
-  "pickup": { "floorId": "floor_1", "x": 4.25, "y": 2.8, "theta": 1.57, "mastHeightCm": 72, "forkDepthCm": 12 },
+  "pickup": { "floorId": "floor_1", "x": 4.25, "y": 2.8, "theta": 1.57, "gripperOpenWidthCm": 8, "gripperCloseWidthCm": 3, "gripHoldSeconds": 2, "pickupDirection": "FRONT" },
   "dropoff": { "seatId": "A12", "x": 8.4, "y": 3.2, "theta": 0 }
 }
 ```
