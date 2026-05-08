@@ -11,6 +11,7 @@ import { BookInventoryModule } from './book-inventory/book-inventory.module';
 import { RobotModule } from './robot/robot.module';
 import { RequestModule } from './request/request.module';
 import { TwitModule } from './twit/twit.module';
+import { TwitCommentModule } from './twit-comment/twit-comment.module';
 
 @Module({
 		imports: [
@@ -26,6 +27,7 @@ import { TwitModule } from './twit/twit.module';
 		RobotModule,
 		RequestModule,
 		TwitModule,
+		TwitCommentModule,
 	],
 })
 export class ComponentsModule {}

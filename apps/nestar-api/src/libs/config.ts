@@ -78,6 +78,12 @@ export const availableTwitSorts = [
 	'updatedAt',
 	'likeCount',
 ];
+export const availableTwitCommentSorts = [
+	'createdAt',
+	'updatedAt',
+	'likeCount',
+	'depth',
+];
 
 // IMAGE CONFIGURATION
 
