@@ -5,7 +5,7 @@ import {
 	InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, ObjectId } from 'mongoose';
+import { Model, ObjectId, PipelineStage } from 'mongoose';
 import { BookStatus } from '../../libs/enums/book.enum';
 import { RobotStatus } from '../../libs/enums/robot.enum';
 import { MemberType } from '../../libs/enums/member.enum';
@@ -194,9 +194,15 @@ export class RequestService {
 	}
 
 	public async getRequestById(requestId: ObjectId): Promise<RequestTask> {
-		const result = await this.requestModel.findOne({ _id: requestId }).exec();
-		if (!result) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
-		return result;
+		const result = await this.requestModel
+			.aggregate([
+				{ $match: { _id: requestId } },
+				...this.buildRequestNestedLookupPipeline(),
+			])
+			.exec();
+		if (!result.length)
+			throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+		return result[0];
 	}
 
 	public async getRequests(input: RequestsInquiry): Promise<Requests> {
@@ -215,6 +221,7 @@ export class RequestService {
 						list: [
 							{ $skip: (input.page - 1) * input.limit },
 							{ $limit: input.limit },
+							...this.buildRequestNestedLookupPipeline(),
 						],
 						metaCounter: [{ $count: 'total' }],
 					},
@@ -252,6 +259,7 @@ export class RequestService {
 						list: [
 							{ $skip: (input.page - 1) * input.limit },
 							{ $limit: input.limit },
+							...this.buildRequestNestedLookupPipeline(),
 						],
 						metaCounter: [{ $count: 'total' }],
 					},
@@ -447,6 +455,121 @@ export class RequestService {
 		if (sessionId) match.sessionId = sessionId;
 		if (destinationDeskId)
 			match.destinationDeskId = { $regex: new RegExp(destinationDeskId, 'i') };
+	}
+
+	private buildRequestNestedLookupPipeline(): PipelineStage.FacetPipelineStage[] {
+		return [
+			{
+				$lookup: {
+					from: 'books',
+					localField: 'bookId',
+					foreignField: '_id',
+					pipeline: [
+						{
+							$project: {
+								_id: 1,
+								bookTitle: 1,
+								bookAuthor: 1,
+								bookImages: 1,
+								bookCallNumber: 1,
+								bookStatus: 1,
+								bookType: 1,
+								bookCategory: 1,
+							},
+						},
+					],
+					as: 'bookData',
+				},
+			},
+			{
+				$unwind: {
+					path: '$bookData',
+					preserveNullAndEmptyArrays: true,
+				},
+			},
+			{
+				$lookup: {
+					from: 'robots',
+					localField: 'robotId',
+					foreignField: '_id',
+					pipeline: [
+						{
+							$project: {
+								_id: 1,
+								robotId: 1,
+								status: 1,
+								isOnline: 1,
+								battery: 1,
+								currentPose: 1,
+								lastSeenAt: 1,
+							},
+						},
+					],
+					as: 'robotData',
+				},
+			},
+			{
+				$unwind: {
+					path: '$robotData',
+					preserveNullAndEmptyArrays: true,
+				},
+			},
+			{
+				$lookup: {
+					from: 'bookInventories',
+					localField: 'sourceInventoryId',
+					foreignField: '_id',
+					pipeline: [
+						{
+							$project: {
+								_id: 1,
+								bookInventoryType: 1,
+								bookInventoryStatus: 1,
+								bookLocation: 1,
+								bookShelf: 1,
+								bookPickup: 1,
+								bookTotalQuantity: 1,
+								bookReservedQuantity: 1,
+								bookBorrowedQuantity: 1,
+								bookSoldQuantity: 1,
+							},
+						},
+					],
+					as: 'inventoryData',
+				},
+			},
+			{
+				$unwind: {
+					path: '$inventoryData',
+					preserveNullAndEmptyArrays: true,
+				},
+			},
+			{
+				$lookup: {
+					from: 'members',
+					localField: 'memberId',
+					foreignField: '_id',
+					pipeline: [
+						{
+							$project: {
+								_id: 1,
+								memberNick: 1,
+								memberImage: 1,
+								memberType: 1,
+								memberStatus: 1,
+							},
+						},
+					],
+					as: 'memberData',
+				},
+			},
+			{
+				$unwind: {
+					path: '$memberData',
+					preserveNullAndEmptyArrays: true,
+				},
+			},
+		];
 	}
 
 	private buildTimelineItem(status: RequestStatus, message?: string): T {
