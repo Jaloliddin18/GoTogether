@@ -72,6 +72,12 @@ export class RequestService {
 				.lean()
 				.exec();
 			if (!book) throw new BadRequestException(RequestErrorCode.BOOK_UNAVAILABLE);
+			if (
+				typeof book.bookCallNumber !== 'string' ||
+				!book.bookCallNumber.trim()
+			) {
+				throw new BadRequestException(Message.BAD_REQUEST);
+			}
 
 			if (input.requestType === RequestType.BORROW && !book.isBorrowable) {
 				throw new BadRequestException(RequestErrorCode.BOOK_UNAVAILABLE);
@@ -253,6 +259,15 @@ export class RequestService {
 		const target = await this.requestModel.findOne({ _id: requestId }).exec();
 		if (!target) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
 		if (target.status === input.status) return target;
+		if (
+			[
+				RequestStatus.COMPLETED,
+				RequestStatus.FAILED,
+				RequestStatus.CANCELLED,
+			].includes(target.status)
+		) {
+			throw new BadRequestException(Message.NOT_ALLOWED_REQUEST);
+		}
 
 		const update: T = {
 			status: input.status,
@@ -324,11 +339,14 @@ export class RequestService {
 	): Promise<RequestTask> {
 		const target = await this.requestModel.findOne({ _id: requestId }).exec();
 		if (!target) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
-		if (target.status === RequestStatus.COMPLETED) {
+		if (
+			[
+				RequestStatus.COMPLETED,
+				RequestStatus.FAILED,
+				RequestStatus.CANCELLED,
+			].includes(target.status)
+		) {
 			throw new BadRequestException(Message.NOT_ALLOWED_REQUEST);
-		}
-		if (target.status === RequestStatus.CANCELLED) {
-			return target;
 		}
 
 		const isAdmin = authMember?.memberType === MemberType.ADMIN;
