@@ -47,6 +47,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				reconnectPeriod: 5000,
 				connectTimeout: 10000,
 			});
+			this.logger.debug(`MQTT client created, connecting to ${maskedBrokerUrl}`);
 		} catch (error: unknown) {
 			const errorMessage: string =
 				error instanceof Error ? error.message : 'Unknown error';
@@ -64,6 +65,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		this.client.on('error', (error: Error) => {
 			this.logger.error(
 				`MQTT connection error (${maskedBrokerUrl}): ${error.message}`,
+				error.stack,
 			);
 		});
 
@@ -236,6 +238,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				lastSeenAt: new Date(),
 				isOnline: true,
 			};
+			const mappedRequestStatus = this.mapToRequestStatus(payload.state);
 
 			if (typeof payload.battery === 'number') {
 				robotUpdate.battery = payload.battery;
@@ -244,9 +247,9 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			const mappedRobotStatus = this.mapToRobotStatus(payload.state);
 			if (mappedRobotStatus) {
 				robotUpdate.status = mappedRobotStatus;
-			} else {
+			} else if (!mappedRequestStatus) {
 				this.logger.warn(
-					`Unknown RobotStatus state=${payload.state}; updating battery/online only for robotId=${payloadRobotId}`,
+					`Unknown telemetry state=${payload.state}; updating battery/online only for robotId=${payloadRobotId}`,
 				);
 			}
 
@@ -265,7 +268,6 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			const requestId: string = String(activeRequest._id);
 			this.startOfflineTimeout(payloadRobotId, requestId);
 
-			const mappedRequestStatus = this.mapToRequestStatus(payload.state);
 			let currentRequest = activeRequest;
 
 			if (!mappedRequestStatus) {
@@ -600,8 +602,19 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	private mapToRobotStatus(state: string): RobotStatus | null {
-		const robotStatuses = Object.values(RobotStatus);
-		return robotStatuses.includes(state as RobotStatus)
+		const statusMap: RobotStatus[] = [
+			RobotStatus.IDLE,
+			RobotStatus.ASSIGNED,
+			RobotStatus.NAVIGATING,
+			RobotStatus.VERIFYING_BOOK,
+			RobotStatus.PICKING_UP,
+			RobotStatus.DELIVERING,
+			RobotStatus.RETURNING,
+			RobotStatus.DOCKING,
+			RobotStatus.ERROR,
+			RobotStatus.MAINTENANCE,
+		];
+		return statusMap.includes(state as RobotStatus)
 			? (state as RobotStatus)
 			: null;
 	}

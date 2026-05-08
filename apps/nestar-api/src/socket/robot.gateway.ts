@@ -46,26 +46,50 @@ export class RobotGateway implements OnGatewayInit {
 	}
 
 	public emitRobotPosition(requestId: string, payload: object): void {
+		if (!this.server) {
+			this.logger.warn('WebSocket server not ready, skipping emit');
+			return;
+		}
 		this.server.to(this.getRequestRoom(requestId)).emit('robotPosition', payload);
 	}
 
 	public emitRobotStatus(requestId: string, payload: object): void {
+		if (!this.server) {
+			this.logger.warn('WebSocket server not ready, skipping emit');
+			return;
+		}
 		this.server.to(this.getRequestRoom(requestId)).emit('robotStatus', payload);
 	}
 
 	public emitRequestUpdated(requestId: string, payload: object): void {
+		if (!this.server) {
+			this.logger.warn('WebSocket server not ready, skipping emit');
+			return;
+		}
 		this.server.to(this.getRequestRoom(requestId)).emit('requestUpdated', payload);
 	}
 
 	public emitRobotOffline(requestId: string, payload: object): void {
+		if (!this.server) {
+			this.logger.warn('WebSocket server not ready, skipping emit');
+			return;
+		}
 		this.server.to(this.getRequestRoom(requestId)).emit('robotOffline', payload);
 	}
 
 	public emitBookNotFound(requestId: string, payload: object): void {
+		if (!this.server) {
+			this.logger.warn('WebSocket server not ready, skipping emit');
+			return;
+		}
 		this.server.to(this.getRequestRoom(requestId)).emit('bookNotFound', payload);
 	}
 
 	public emitDeliveryReady(requestId: string, payload: object): void {
+		if (!this.server) {
+			this.logger.warn('WebSocket server not ready, skipping emit');
+			return;
+		}
 		this.server.to(this.getRequestRoom(requestId)).emit('deliveryReady', payload);
 	}
 
