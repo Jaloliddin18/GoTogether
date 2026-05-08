@@ -188,6 +188,10 @@ export class BookInventoryService {
 			maxTotalQuantity,
 			minSoldQuantity,
 			maxSoldQuantity,
+			minReservedQuantity,
+			maxReservedQuantity,
+			minBorrowedQuantity,
+			maxBorrowedQuantity,
 		} = input.search;
 
 		if (bookId) match.bookId = shapeIntoMongoObjectId(bookId);
@@ -223,6 +227,32 @@ export class BookInventoryService {
 			}
 			if (typeof maxSoldQuantity === 'number') {
 				match.bookSoldQuantity.$lte = maxSoldQuantity;
+			}
+		}
+
+		if (
+			typeof minReservedQuantity === 'number' ||
+			typeof maxReservedQuantity === 'number'
+		) {
+			match.bookReservedQuantity = {};
+			if (typeof minReservedQuantity === 'number') {
+				match.bookReservedQuantity.$gte = minReservedQuantity;
+			}
+			if (typeof maxReservedQuantity === 'number') {
+				match.bookReservedQuantity.$lte = maxReservedQuantity;
+			}
+		}
+
+		if (
+			typeof minBorrowedQuantity === 'number' ||
+			typeof maxBorrowedQuantity === 'number'
+		) {
+			match.bookBorrowedQuantity = {};
+			if (typeof minBorrowedQuantity === 'number') {
+				match.bookBorrowedQuantity.$gte = minBorrowedQuantity;
+			}
+			if (typeof maxBorrowedQuantity === 'number') {
+				match.bookBorrowedQuantity.$lte = maxBorrowedQuantity;
 			}
 		}
 	}
