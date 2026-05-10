@@ -5,7 +5,7 @@ import {
 	MemberInput,
 	MembersInquiry,
 } from '../../libs/dto/member/member.input';
-import { Member, MemberProfile, Members } from '../../libs/dto/member/member';
+import { Member, Members } from '../../libs/dto/member/member';
 import { InternalServerErrorException, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { AuthMember } from '../auth/decorators/authMember.decorator';
@@ -81,17 +81,6 @@ export class MemberResolver {
 		console.log('Query: getMember');
 		const targetId = shapeIntoMongoObjectId(input);
 		return await this.memberService.getMember(memberId, targetId);
-	}
-
-	@UseGuards(WithoutGuard)
-	@Query(() => MemberProfile)
-	public async getMemberProfile(
-		@Args('memberId') input: string,
-		@AuthMember('_id') memberId: ObjectId,
-	): Promise<MemberProfile> {
-		console.log('Query: getMemberProfile');
-		const targetId = shapeIntoMongoObjectId(input);
-		return await this.memberService.getMemberProfile(memberId, targetId);
 	}
 
 	@UseGuards(AuthGuard)

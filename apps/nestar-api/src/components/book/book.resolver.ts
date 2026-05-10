@@ -42,16 +42,6 @@ export class BookResolver {
 		return await this.bookService.getBooks(memberId, input);
 	}
 
-	@Roles(MemberType.ADMIN)
-	@UseGuards(RolesGuard)
-	@Query(() => Books)
-	public async getAllBooksByAdmin(
-		@Args('input') input: AllBooksInquiry,
-	): Promise<Books> {
-		console.log('Query: getAllBooksByAdmin');
-		return await this.bookService.getAllBooksByAdmin(input);
-	}
-
 	@UseGuards(WithoutGuard)
 	@Query(() => Book)
 	public async getBook(
@@ -105,12 +95,22 @@ export class BookResolver {
 		return await this.bookService.likeTargetBook(memberId, likeRefId);
 	}
 
+	// ADMIN //
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Query(() => Books)
+	public async getAllBooksByAdmin(
+		@Args('input') input: AllBooksInquiry,
+	): Promise<Books> {
+		console.log('Query: getAllBooksByAdmin');
+		return await this.bookService.getAllBooksByAdmin(input);
+	}
+
 	@Roles(MemberType.ADMIN)
 	@UseGuards(RolesGuard)
 	@Mutation(() => Book)
-	public async removeBookByAdmin(
-		@Args('bookId') input: string,
-	): Promise<Book> {
+	public async removeBookByAdmin(@Args('bookId') input: string): Promise<Book> {
 		console.log('Mutation: removeBookByAdmin');
 		const bookId = shapeIntoMongoObjectId(input);
 		return await this.bookService.removeBookByAdmin(bookId);
