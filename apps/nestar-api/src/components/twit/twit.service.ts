@@ -90,9 +90,14 @@ export class TwitService {
 	}
 
 	public async getMemberTwits(
-		targetMemberId: ObjectId,
+		viewerId: ObjectId | null,
 		input: TwitsInquiry,
 	): Promise<Twits> {
+		const targetMemberId = input.search?.memberId
+			? shapeIntoMongoObjectId(input.search.memberId)
+			: viewerId;
+		if (!targetMemberId) throw new BadRequestException(Message.BAD_REQUEST);
+
 		const sort: T = {
 			[input?.sort ?? 'createdAt']: input?.direction ?? Direction.DESC,
 		};

@@ -44,12 +44,11 @@ export class TwitResolver {
 	@UseGuards(WithoutGuard)
 	@Query(() => Twits)
 	public async getMemberTwits(
-		@Args('memberId') input: string,
-		@Args('input') inquiry: TwitsInquiry,
+		@Args('input') input: TwitsInquiry,
+		@AuthMember('_id') viewerId: ObjectId,
 	): Promise<Twits> {
 		console.log('Query: getMemberTwits');
-		const memberId = shapeIntoMongoObjectId(input);
-		return await this.twitService.getMemberTwits(memberId, inquiry);
+		return await this.twitService.getMemberTwits(viewerId, input);
 	}
 
 	@UseGuards(AuthGuard)

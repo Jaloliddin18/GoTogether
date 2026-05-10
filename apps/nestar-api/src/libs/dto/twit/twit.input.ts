@@ -21,6 +21,10 @@ class TwitSearch {
 	@IsOptional()
 	@Field(() => String, { nullable: true })
 	text?: string;
+
+	@IsOptional()
+	@Field(() => String, { nullable: true })
+	memberId?: string;
 }
 
 @InputType()
