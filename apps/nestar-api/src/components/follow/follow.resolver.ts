@@ -54,15 +54,4 @@ export class FollowResolver {
 		console.log('Query: getMemberFollowers');
 		return await this.followService.getMemberFollowers(viewerId, input);
 	}
-
-	@UseGuards(AuthGuard)
-	@Query(() => Boolean)
-	public async checkFollowing(
-		@Args('memberId') targetId: string,
-		@AuthMember('_id') memberId: ObjectId,
-	): Promise<boolean> {
-		console.log('Query: checkFollowing');
-		const followingId = shapeIntoMongoObjectId(targetId);
-		return await this.followService.checkFollowing(memberId, followingId);
-	}
 }

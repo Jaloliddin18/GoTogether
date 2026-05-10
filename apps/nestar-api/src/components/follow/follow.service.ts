@@ -158,18 +158,7 @@ export class FollowService {
 					},
 				},
 			])
-			.exec();
+				.exec();
 		return result[0];
-	}
-
-	public async checkFollowing(
-		followerId: ObjectId,
-		followingId: ObjectId,
-	): Promise<boolean> {
-		await this.memberService.getMember(null, followingId);
-		const existing = await this.followModel
-			.findOne({ followerId, followingId })
-			.exec();
-		return !!existing;
 	}
 }
