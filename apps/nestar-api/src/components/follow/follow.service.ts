@@ -16,6 +16,8 @@ import { Direction, Message } from '../../libs/enums/common.enum';
 import { FollowInquiry } from '../../libs/dto/follow/follow.input';
 import { T } from '../../libs/types/common';
 import {
+	shapeIntoMongoObjectId,
+	lookupAuthMemberLiked,
 	lookupAuthMemberFollowed,
 	lookupFollowerData,
 	lookupFollowingData,
@@ -29,7 +31,7 @@ export class FollowService {
 		private readonly memberService: MemberService,
 	) {}
 
-	public async followMember(
+	public async subscribe(
 		followerId: ObjectId,
 		followingId: ObjectId,
 	): Promise<Follower> {
@@ -45,7 +47,7 @@ export class FollowService {
 		return await this.registerFollow(followerId, followingId);
 	}
 
-	public async unfollowMember(
+	public async unsubscribe(
 		followerId: ObjectId,
 		followingId: ObjectId,
 	): Promise<Follower> {
@@ -84,11 +86,15 @@ export class FollowService {
 		}
 	}
 
-	public async getFollowing(
-		targetMemberId: ObjectId,
+	public async getMemberFollowings(
 		viewerId: ObjectId | null,
 		input: FollowInquiry,
 	): Promise<Followings> {
+		const targetMemberId = input.search?.followerId
+			? shapeIntoMongoObjectId(input.search.followerId)
+			: null;
+		if (!targetMemberId) throw new BadRequestException(Message.BAD_REQUEST);
+
 		await this.memberService.getMember(null, targetMemberId);
 		const { page, limit } = input;
 		const match: T = { followerId: targetMemberId };
@@ -106,6 +112,7 @@ export class FollowService {
 								followerId: viewerId,
 								followingId: '$followingId',
 							}),
+							lookupAuthMemberLiked(viewerId, '$followingId'),
 							lookupFollowingData,
 							{ $unwind: '$followingData' },
 						],
@@ -117,11 +124,15 @@ export class FollowService {
 		return result[0];
 	}
 
-	public async getFollowers(
-		targetMemberId: ObjectId,
+	public async getMemberFollowers(
 		viewerId: ObjectId | null,
 		input: FollowInquiry,
 	): Promise<Followers> {
+		const targetMemberId = input.search?.followingId
+			? shapeIntoMongoObjectId(input.search.followingId)
+			: null;
+		if (!targetMemberId) throw new BadRequestException(Message.BAD_REQUEST);
+
 		await this.memberService.getMember(null, targetMemberId);
 		const { page, limit } = input;
 		const match: T = { followingId: targetMemberId };
@@ -139,6 +150,7 @@ export class FollowService {
 								followerId: viewerId,
 								followingId: '$followerId',
 							}),
+							lookupAuthMemberLiked(viewerId, '$followerId'),
 							lookupFollowerData,
 							{ $unwind: '$followerData' },
 						],

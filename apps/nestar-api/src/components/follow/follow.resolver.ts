@@ -21,7 +21,7 @@ export class FollowResolver {
 	): Promise<Follower> {
 		console.log('Mutation: subscribe');
 		const followingId = shapeIntoMongoObjectId(input);
-		return await this.followService.followMember(memberId, followingId);
+		return await this.followService.subscribe(memberId, followingId);
 	}
 
 	@UseGuards(AuthGuard)
@@ -32,31 +32,27 @@ export class FollowResolver {
 	): Promise<Follower> {
 		console.log('Mutation: unsubscribe');
 		const followingId = shapeIntoMongoObjectId(input);
-		return await this.followService.unfollowMember(memberId, followingId);
+		return await this.followService.unsubscribe(memberId, followingId);
 	}
 
 	@UseGuards(WithoutGuard)
 	@Query(() => Followings)
 	public async getMemberFollowings(
-		@Args('memberId') targetId: string,
 		@Args('input') input: FollowInquiry,
 		@AuthMember('_id') viewerId: ObjectId,
 	): Promise<Followings> {
 		console.log('Query: getMemberFollowings');
-		const memberId = shapeIntoMongoObjectId(targetId);
-		return await this.followService.getFollowing(memberId, viewerId, input);
+		return await this.followService.getMemberFollowings(viewerId, input);
 	}
 
 	@UseGuards(WithoutGuard)
 	@Query(() => Followers)
 	public async getMemberFollowers(
-		@Args('memberId') targetId: string,
 		@Args('input') input: FollowInquiry,
 		@AuthMember('_id') viewerId: ObjectId,
 	): Promise<Followers> {
 		console.log('Query: getMemberFollowers');
-		const memberId = shapeIntoMongoObjectId(targetId);
-		return await this.followService.getFollowers(memberId, viewerId, input);
+		return await this.followService.getMemberFollowers(viewerId, input);
 	}
 
 	@UseGuards(AuthGuard)
