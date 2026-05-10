@@ -14,7 +14,7 @@ export class FollowResolver {
 	constructor(private readonly followService: FollowService) {}
 
 	@UseGuards(AuthGuard)
-	@Mutation(() => Follower)
+	@Mutation(() => Follower, { name: 'Subscribe' })
 	public async followMember(
 		@Args('memberId') input: string,
 		@AuthMember('_id') memberId: ObjectId,
@@ -25,7 +25,7 @@ export class FollowResolver {
 	}
 
 	@UseGuards(AuthGuard)
-	@Mutation(() => Follower)
+	@Mutation(() => Follower, { name: 'Unsubscribe' })
 	public async unfollowMember(
 		@Args('memberId') input: string,
 		@AuthMember('_id') memberId: ObjectId,
@@ -36,7 +36,7 @@ export class FollowResolver {
 	}
 
 	@UseGuards(WithoutGuard)
-	@Query(() => Followings)
+	@Query(() => Followings, { name: 'GetMemberFollowings' })
 	public async getFollowing(
 		@Args('memberId') targetId: string,
 		@Args('input') input: FollowInquiry,
@@ -48,7 +48,7 @@ export class FollowResolver {
 	}
 
 	@UseGuards(WithoutGuard)
-	@Query(() => Followers)
+	@Query(() => Followers, { name: 'GetMemberFollowers' })
 	public async getFollowers(
 		@Args('memberId') targetId: string,
 		@Args('input') input: FollowInquiry,
