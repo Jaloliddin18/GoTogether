@@ -21,6 +21,13 @@ export class CreateTwitCommentInput {
 }
 
 @InputType()
+class TCSearch {
+	@IsOptional()
+	@Field(() => String, { nullable: true })
+	twitId?: string;
+}
+
+@InputType()
 export class TwitCommentsInquiry {
 	@IsNotEmpty()
 	@Min(1)
@@ -40,4 +47,8 @@ export class TwitCommentsInquiry {
 	@IsOptional()
 	@Field(() => Direction, { nullable: true })
 	direction?: Direction;
+
+	@IsNotEmpty()
+	@Field(() => TCSearch)
+	search: TCSearch;
 }

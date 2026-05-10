@@ -38,13 +38,11 @@ export class TwitCommentResolver {
 	@UseGuards(WithoutGuard)
 	@Query(() => TwitComments)
 	public async getTwitComments(
-		@Args('twitId') input: string,
-		@Args('input') inquiry: TwitCommentsInquiry,
+		@Args('input') input: TwitCommentsInquiry,
 		@AuthMember('_id') viewerId: ObjectId,
 	): Promise<TwitComments> {
 		console.log('Query: getTwitComments');
-		const twitId = shapeIntoMongoObjectId(input);
-		return await this.twitCommentService.getTwitComments(twitId, viewerId, inquiry);
+		return await this.twitCommentService.getTwitComments(viewerId, input);
 	}
 
 	@UseGuards(AuthGuard)

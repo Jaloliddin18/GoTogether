@@ -15,7 +15,7 @@ import { Member } from '../../libs/dto/member/member';
 import { MemberType } from '../../libs/enums/member.enum';
 import { Direction, Message } from '../../libs/enums/common.enum';
 import { T } from '../../libs/types/common';
-import { lookupMember } from '../../libs/config';
+import { lookupMember, shapeIntoMongoObjectId } from '../../libs/config';
 
 interface TwitDoc {
 	_id: ObjectId;
@@ -85,10 +85,14 @@ export class TwitCommentService {
 	}
 
 	public async getTwitComments(
-		twitId: ObjectId,
 		viewerId: ObjectId | null,
 		input: TwitCommentsInquiry,
 	): Promise<TwitComments> {
+		const twitId = input.search?.twitId
+			? shapeIntoMongoObjectId(input.search.twitId)
+			: null;
+		if (!twitId) throw new BadRequestException(Message.BAD_REQUEST);
+
 		await this.checkTwitExists(twitId);
 
 		const sort: T = {
