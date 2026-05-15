@@ -17,6 +17,13 @@ export class CreateTwitInput {
 }
 
 @InputType()
+export class TwitInquiry {
+	@IsNotEmpty()
+	@Field(() => String)
+	_id: ObjectId;
+}
+
+@InputType()
 class TwitSearch {
 	@IsOptional()
 	@Field(() => String, { nullable: true })

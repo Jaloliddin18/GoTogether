@@ -9,6 +9,7 @@ import { Twit, Twits } from '../../libs/dto/twit/twit';
 import {
 	AllTwitsInquiry,
 	CreateTwitInput,
+	TwitInquiry,
 	TwitsInquiry,
 } from '../../libs/dto/twit/twit.input';
 import { TwitUpdate } from '../../libs/dto/twit/twit.update';
@@ -47,6 +48,20 @@ export class TwitService {
 			console.log('Error, Service.model:', msg);
 			throw new BadRequestException(Message.CREATE_FAILED);
 		}
+	}
+
+	public async getTwit(input: TwitInquiry): Promise<Twit> {
+		const result = await this.twitModel
+			.aggregate([
+				{ $match: { _id: input._id, deletedAt: null } },
+				lookupMember,
+				{ $unwind: '$memberData' },
+			])
+			.exec();
+		const targetTwit: Twit = result[0];
+		if (!targetTwit)
+			throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+		return targetTwit;
 	}
 
 	public async getTwits(memberId: ObjectId, input: TwitsInquiry): Promise<Twits> {

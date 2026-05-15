@@ -10,6 +10,7 @@ import { Twit, Twits } from '../../libs/dto/twit/twit';
 import {
 	AllTwitsInquiry,
 	CreateTwitInput,
+	TwitInquiry,
 	TwitsInquiry,
 } from '../../libs/dto/twit/twit.input';
 import { TwitUpdate } from '../../libs/dto/twit/twit.update';
@@ -29,6 +30,16 @@ export class TwitResolver {
 	): Promise<Twit> {
 		console.log('Mutation: createTwit');
 		return await this.twitService.createTwit(memberId, input);
+	}
+
+	@UseGuards(AuthGuard)
+	@Query(() => Twit)
+	public async getTwit(
+		@Args('input') input: TwitInquiry,
+	): Promise<Twit> {
+		console.log('Query: getTwit');
+		input._id = shapeIntoMongoObjectId(input._id);
+		return await this.twitService.getTwit(input);
 	}
 
 	@UseGuards(AuthGuard)
