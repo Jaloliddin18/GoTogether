@@ -14,6 +14,7 @@ import {
 } from '../../libs/dto/twit/twit.input';
 import { TwitUpdate } from '../../libs/dto/twit/twit.update';
 import { Direction, Message } from '../../libs/enums/common.enum';
+import { TwitFeedType } from '../../libs/enums/twit.enum';
 import { T } from '../../libs/types/common';
 import { lookupMember, shapeIntoMongoObjectId } from '../../libs/config';
 
@@ -35,7 +36,10 @@ const normalizeMemberDataCounters = {
 
 @Injectable()
 export class TwitService {
-	constructor(@InjectModel('Twit') private readonly twitModel: Model<Twit>) {}
+	constructor(
+		@InjectModel('Twit') private readonly twitModel: Model<Twit>,
+		@InjectModel('Follow') private readonly followModel: Model<{ followingId: ObjectId }>,
+	) {}
 
 	public async createTwit(
 		memberId: ObjectId,
@@ -73,16 +77,42 @@ export class TwitService {
 		return targetTwit;
 	}
 
-	public async getTwits(input: TwitsInquiry): Promise<Twits> {
+	public async getTwits(
+		viewerId: ObjectId | null,
+		input: TwitsInquiry,
+	): Promise<Twits> {
 		const sort: T = {
 			[input?.sort ?? 'createdAt']: input?.direction ?? Direction.DESC,
 		};
 		const match: T = {
 			deletedAt: null,
 		};
+		const feedType = input.feedType ?? TwitFeedType.FOR_YOU;
+
+		let followingMemberIds: ObjectId[] | null = null;
+		if (feedType === TwitFeedType.FOLLOWING) {
+			if (!viewerId) {
+				followingMemberIds = [];
+			} else {
+				followingMemberIds = await this.followModel
+					.distinct('followingId', { followerId: viewerId })
+					.exec();
+			}
+		}
 
 		if (input.search?.memberId) {
-			match.memberId = shapeIntoMongoObjectId(input.search.memberId);
+			const targetMemberId = shapeIntoMongoObjectId(input.search.memberId);
+			if (followingMemberIds) {
+				match.memberId = {
+					$in: followingMemberIds.filter(
+						(memberId) => memberId.toString() === targetMemberId.toString(),
+					),
+				};
+			} else {
+				match.memberId = targetMemberId;
+			}
+		} else if (followingMemberIds) {
+			match.memberId = { $in: followingMemberIds };
 		}
 
 		if (input.search?.text) {

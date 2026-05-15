@@ -42,9 +42,12 @@ export class TwitResolver {
 
 	@UseGuards(WithoutGuard)
 	@Query(() => Twits)
-	public async getTwits(@Args('input') input: TwitsInquiry): Promise<Twits> {
+	public async getTwits(
+		@Args('input') input: TwitsInquiry,
+		@AuthMember('_id') viewerId: ObjectId | null,
+	): Promise<Twits> {
 		console.log('Query: getTwits');
-		return await this.twitService.getTwits(input);
+		return await this.twitService.getTwits(viewerId, input);
 	}
 
 	@UseGuards(WithoutGuard)

@@ -3,6 +3,7 @@ import { IsBoolean, IsIn, IsNotEmpty, IsOptional, Length, Min } from 'class-vali
 import type { ObjectId } from 'mongoose';
 import { availableTwitSorts } from '../../config';
 import { Direction } from '../../enums/common.enum';
+import { TwitFeedType } from '../../enums/twit.enum';
 
 @InputType()
 export class CreateTwitInput {
@@ -58,6 +59,11 @@ export class TwitsInquiry {
 	@IsOptional()
 	@Field(() => TwitSearch, { nullable: true })
 	search?: TwitSearch;
+
+	@IsOptional()
+	@IsIn(Object.values(TwitFeedType))
+	@Field(() => TwitFeedType, { nullable: true })
+	feedType?: TwitFeedType;
 }
 
 @InputType()
