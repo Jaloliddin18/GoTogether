@@ -17,8 +17,15 @@ import { Direction, Message } from '../../libs/enums/common.enum';
 import { TwitFeedType } from '../../libs/enums/twit.enum';
 import { ViewGroup } from '../../libs/enums/view.enum';
 import { T } from '../../libs/types/common';
-import { lookupMember, shapeIntoMongoObjectId } from '../../libs/config';
+import {
+	lookupAuthMemberLiked,
+	lookupMember,
+	shapeIntoMongoObjectId,
+} from '../../libs/config';
 import { ViewService } from '../view/view.service';
+import { LikeService } from '../like/like.service';
+import { LikeInput } from '../../libs/dto/like/like.input';
+import { LikeGroup } from '../../libs/enums/like.enum';
 
 const normalizeMemberDataCounters = {
 	$addFields: {
@@ -43,12 +50,19 @@ const normalizeTwitCounters = {
 	},
 };
 
+const projectMeLiked = {
+	$addFields: {
+		meLiked: { $gt: [{ $size: '$meLiked' }, 0] },
+	},
+};
+
 @Injectable()
 export class TwitService {
 	constructor(
 		@InjectModel('Twit') private readonly twitModel: Model<Twit>,
 		@InjectModel('Follow') private readonly followModel: Model<{ followingId: ObjectId }>,
 		private readonly viewService: ViewService,
+		private readonly likeService: LikeService,
 	) {}
 
 	public async createTwit(
@@ -80,6 +94,8 @@ export class TwitService {
 			.aggregate([
 				{ $match: { _id: input._id, deletedAt: null } },
 				normalizeTwitCounters,
+				lookupAuthMemberLiked(memberId),
+				projectMeLiked,
 				lookupMember,
 				{ $unwind: '$memberData' },
 				normalizeMemberDataCounters,
@@ -163,6 +179,8 @@ export class TwitService {
 							{ $skip: (input.page - 1) * input.limit },
 							{ $limit: input.limit },
 							normalizeTwitCounters,
+							lookupAuthMemberLiked(viewerId),
+							projectMeLiked,
 							lookupMember,
 							{ $unwind: '$memberData' },
 							normalizeMemberDataCounters,
@@ -229,25 +247,17 @@ export class TwitService {
 			.exec();
 		if (!target) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
 
-		const alreadyLiked = target.likes.some(
-			(likeMemberId: ObjectId) => likeMemberId.toString() === memberId.toString(),
-		);
-
-		const result = alreadyLiked
-			? await this.twitModel
-					.findOneAndUpdate(
-						{ _id: twitId, likes: memberId, deletedAt: null },
-						{ $pull: { likes: memberId }, $inc: { likeCount: -1 } },
-						{ new: true },
-					)
-					.exec()
-			: await this.twitModel
-					.findOneAndUpdate(
-						{ _id: twitId, likes: { $ne: memberId }, deletedAt: null },
-						{ $addToSet: { likes: memberId }, $inc: { likeCount: 1 } },
-						{ new: true },
-					)
-					.exec();
+		const input: LikeInput = {
+			memberId,
+			likeRefId: twitId,
+			likeGroup: LikeGroup.TWIT,
+		};
+		const modifier = await this.likeService.toggleLike(input);
+		const result = await this.twitStatsEditor({
+			_id: twitId,
+			targetKey: 'likeCount',
+			modifier,
+		});
 
 		if (!result)
 			throw new InternalServerErrorException(Message.SOMETHING_WENT_WRONG);
@@ -336,5 +346,20 @@ export class TwitService {
 			.exec();
 		if (!result) throw new InternalServerErrorException(Message.REMOVE_FAILED);
 		return result;
+	}
+
+	private async twitStatsEditor(input: {
+		_id: ObjectId;
+		targetKey: string;
+		modifier: number;
+	}): Promise<Twit | null> {
+		const { _id, targetKey, modifier } = input;
+		return await this.twitModel
+			.findOneAndUpdate(
+				{ _id, deletedAt: null },
+				{ $inc: { [targetKey]: modifier } },
+				{ new: true },
+			)
+			.exec();
 	}
 }

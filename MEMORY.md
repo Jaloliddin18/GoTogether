@@ -33,6 +33,14 @@ develop
 - Added `$ifNull` normalization for `viewCount` in Twit aggregate pipelines to protect older docs with missing values.
 - Wired `ViewModule` into `TwitModule`.
 
+### Twit like-system migration to centralized Like collection (2026-05-15)
+- Twit likes migrated from embedded array to centralized `Like` collection.
+- Added `LikeGroup.TWIT` to `LikeGroup` enum.
+- Wired `LikeModule` into `TwitModule`.
+- `likeTwit` now uses `LikeService.toggleLike` pattern (same as Book), then updates `likeCount` with modifier.
+- `meLiked` is computed via `lookupAuthMemberLiked` in `getTwit` and `getTwits` aggregates.
+- Removed `likes: ObjectId[]` from Twit schema.
+
 ### BookInventory pickup model (fixed gripper)
 - Removed old fork/container fields:
   - `mastHeightCm`

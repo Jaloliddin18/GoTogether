@@ -16,11 +16,11 @@ export class Twit {
 	@Field(() => String, { nullable: true })
 	image?: string;
 
-	@Field(() => [String])
-	likes: ObjectId[];
-
 	@Field(() => Int)
 	likeCount: number;
+
+	@Field(() => Boolean, { nullable: true })
+	meLiked?: boolean;
 
 	@Field(() => Int)
 	viewCount: number;

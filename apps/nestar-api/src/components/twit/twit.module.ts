@@ -6,6 +6,7 @@ import { TwitService } from './twit.service';
 import TwitSchema from '../../schemas/Twit.model';
 import FollowSchema from '../../schemas/Follow.model';
 import { ViewModule } from '../view/view.module';
+import { LikeModule } from '../like/like.module';
 
 @Module({
 	imports: [
@@ -13,6 +14,7 @@ import { ViewModule } from '../view/view.module';
 		MongooseModule.forFeature([{ name: 'Follow', schema: FollowSchema }]),
 		AuthModule,
 		ViewModule,
+		LikeModule,
 	],
 	providers: [TwitResolver, TwitService],
 	exports: [TwitService],
