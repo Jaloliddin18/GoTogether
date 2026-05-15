@@ -15,14 +15,12 @@ import {
 import { TwitUpdate } from '../../libs/dto/twit/twit.update';
 import { Direction, Message } from '../../libs/enums/common.enum';
 import { TwitFeedType } from '../../libs/enums/twit.enum';
-import { ViewGroup } from '../../libs/enums/view.enum';
 import { T } from '../../libs/types/common';
 import {
 	lookupAuthMemberLiked,
 	lookupMember,
 	shapeIntoMongoObjectId,
 } from '../../libs/config';
-import { ViewService } from '../view/view.service';
 import { LikeService } from '../like/like.service';
 import { LikeInput } from '../../libs/dto/like/like.input';
 import { LikeGroup } from '../../libs/enums/like.enum';
@@ -61,7 +59,6 @@ export class TwitService {
 	constructor(
 		@InjectModel('Twit') private readonly twitModel: Model<Twit>,
 		@InjectModel('Follow') private readonly followModel: Model<{ followingId: ObjectId }>,
-		private readonly viewService: ViewService,
 		private readonly likeService: LikeService,
 	) {}
 
@@ -104,25 +101,6 @@ export class TwitService {
 		const targetTwit: Twit = result[0];
 		if (!targetTwit)
 			throw new InternalServerErrorException(Message.NO_DATA_FOUND);
-
-		if (memberId) {
-			const viewInput = {
-				memberId,
-				viewRefId: input._id,
-				viewGroup: ViewGroup.TWIT,
-			};
-			const newView = await this.viewService.recordView(viewInput);
-			if (newView) {
-				await this.twitModel
-					.findOneAndUpdate(
-						{ _id: input._id, deletedAt: null },
-						{ $inc: { viewCount: 1 } },
-						{ new: true },
-					)
-					.exec();
-				targetTwit.viewCount = (targetTwit.viewCount ?? 0) + 1;
-			}
-		}
 
 		return targetTwit;
 	}
@@ -346,6 +324,15 @@ export class TwitService {
 			.exec();
 		if (!result) throw new InternalServerErrorException(Message.REMOVE_FAILED);
 		return result;
+	}
+
+	public async incrementViewCount(twitId: ObjectId): Promise<void> {
+		await this.twitModel
+			.findOneAndUpdate(
+				{ _id: twitId, deletedAt: null },
+				{ $inc: { viewCount: 1 } },
+			)
+			.exec();
 	}
 
 	private async twitStatsEditor(input: {

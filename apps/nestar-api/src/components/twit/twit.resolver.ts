@@ -17,10 +17,15 @@ import { TwitUpdate } from '../../libs/dto/twit/twit.update';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { MemberType } from '../../libs/enums/member.enum';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { ViewService } from '../view/view.service';
+import { ViewGroup } from '../../libs/enums/view.enum';
 
 @Resolver()
 export class TwitResolver {
-	constructor(private readonly twitService: TwitService) {}
+	constructor(
+		private readonly twitService: TwitService,
+		private readonly viewService: ViewService,
+	) {}
 
 	@UseGuards(AuthGuard)
 	@Mutation(() => Twit)
@@ -40,7 +45,19 @@ export class TwitResolver {
 	): Promise<Twit> {
 		console.log('Query: getTwit');
 		input._id = shapeIntoMongoObjectId(input._id);
-		return await this.twitService.getTwit(memberId, input);
+		const twit = await this.twitService.getTwit(memberId, input);
+		if (memberId) {
+			const newView = await this.viewService.recordView({
+				memberId,
+				viewRefId: input._id,
+				viewGroup: ViewGroup.TWIT,
+			});
+			if (newView) {
+				twit.viewCount = (twit.viewCount ?? 0) + 1;
+				await this.twitService.incrementViewCount(input._id);
+			}
+		}
+		return twit;
 	}
 
 	@UseGuards(WithoutGuard)
