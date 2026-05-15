@@ -243,7 +243,7 @@ export class TwitService {
 
 	public async likeTwit(memberId: ObjectId, twitId: ObjectId): Promise<Twit> {
 		const target = await this.twitModel
-			.findOne({ _id: twitId, deletedAt: null })
+			.findOne({ _id: twitId })
 			.exec();
 		if (!target) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
 
@@ -253,26 +253,11 @@ export class TwitService {
 			likeGroup: LikeGroup.TWIT,
 		};
 		const modifier = await this.likeService.toggleLike(input);
-		const result = await this.twitModel
-			.findOneAndUpdate(
-				{ _id: twitId, deletedAt: null },
-				[
-					{
-						$set: {
-							likeCount: {
-								$max: [
-									{
-										$add: [{ $ifNull: ['$likeCount', 0] }, modifier],
-									},
-									0,
-								],
-							},
-						},
-					},
-				],
-				{ new: true },
-			)
-			.exec();
+		const result = await this.twitStatsEditor({
+			_id: twitId,
+			targetKey: 'likeCount',
+			modifier,
+		});
 
 		if (!result)
 			throw new InternalServerErrorException(Message.SOMETHING_WENT_WRONG);
@@ -361,6 +346,21 @@ export class TwitService {
 			.exec();
 		if (!result) throw new InternalServerErrorException(Message.REMOVE_FAILED);
 		return result;
+	}
+
+	private async twitStatsEditor(input: {
+		_id: ObjectId;
+		targetKey: string;
+		modifier: number;
+	}): Promise<Twit | null> {
+		const { _id, targetKey, modifier } = input;
+		return await this.twitModel
+			.findOneAndUpdate(
+				{ _id, deletedAt: null },
+				{ $inc: { [targetKey]: modifier } },
+				{ new: true },
+			)
+			.exec();
 	}
 
 }
