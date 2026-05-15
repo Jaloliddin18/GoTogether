@@ -8,6 +8,7 @@ import { ViewModule } from '../view/view.module';
 import { LikeModule } from '../like/like.module';
 import FollowSchema from '../../schemas/Follow.model';
 import TwitSchema from '../../schemas/Twit.model';
+import { MemberHealthCheckService } from './member-health-check.service';
 
 @Module({
 	imports: [
@@ -18,7 +19,7 @@ import TwitSchema from '../../schemas/Twit.model';
 		ViewModule,
 		LikeModule,
 	],
-	providers: [MemberResolver, MemberService],
+	providers: [MemberResolver, MemberService, MemberHealthCheckService],
 	exports: [MemberService],
 })
 export class MemberModule {}

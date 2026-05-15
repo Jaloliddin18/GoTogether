@@ -114,6 +114,34 @@
   - stale statuses after `READY` are ignored
   - late `BOOK_NOT_FOUND` after `READY` is ignored
 
+### 3.6 Twit read API + member data hardening (2026-05-15)
+- Scope:
+  - `getTwits`
+  - `getTwit`
+  - `getMemberTwits`
+- Auth behavior update:
+  - these read APIs are now usable by not-logged-in users through `WithoutGuard`
+  - `getTwits` no longer switches into auth-follow feed filtering
+  - `getTwits` now returns general twits from DB (`deletedAt: null`) and still supports optional `search.memberId` and `search.text`
+- Member GraphQL null-safety fix:
+  - Twit aggregates now normalize missing member counter fields to `0` before returning `memberData`
+  - fixed runtime error:
+    - `Cannot return null for non-nullable field Member.memberTwits`
+- Twit module cleanup:
+  - removed unused `Follow` model injection from Twit module/service after `getTwits` feed-filter removal
+- One-time DB maintenance executed:
+  - added script:
+    - `apps/nestar-api/src/scripts/backfill-member-counters.ts`
+  - added npm command:
+    - `npm run backfill:member-counters`
+  - execution result on 2026-05-15:
+    - `matched=7`
+    - `modified=2`
+- Startup guardrail added (non-mutating):
+  - new `MemberHealthCheckService` runs on backend startup
+  - checks all member counter fields for malformed/non-numeric values
+  - logs pass/warn summary and samples (max 10) without changing DB data
+
 ## 4. Build verification
 - `npm run build` passes after Phase 4/5/6 implementation and follow-up fixes.
 

@@ -32,31 +32,26 @@ export class TwitResolver {
 		return await this.twitService.createTwit(memberId, input);
 	}
 
-	@UseGuards(AuthGuard)
+	@UseGuards(WithoutGuard)
 	@Query(() => Twit)
-	public async getTwit(
-		@Args('input') input: TwitInquiry,
-	): Promise<Twit> {
+	public async getTwit(@Args('input') input: TwitInquiry): Promise<Twit> {
 		console.log('Query: getTwit');
 		input._id = shapeIntoMongoObjectId(input._id);
 		return await this.twitService.getTwit(input);
 	}
 
-	@UseGuards(AuthGuard)
+	@UseGuards(WithoutGuard)
 	@Query(() => Twits)
-	public async getTwits(
-		@Args('input') input: TwitsInquiry,
-		@AuthMember('_id') memberId: ObjectId,
-	): Promise<Twits> {
+	public async getTwits(@Args('input') input: TwitsInquiry): Promise<Twits> {
 		console.log('Query: getTwits');
-		return await this.twitService.getTwits(memberId, input);
+		return await this.twitService.getTwits(input);
 	}
 
 	@UseGuards(WithoutGuard)
 	@Query(() => Twits)
 	public async getMemberTwits(
 		@Args('input') input: TwitsInquiry,
-		@AuthMember('_id') viewerId: ObjectId,
+		@AuthMember('_id') viewerId: ObjectId | null,
 	): Promise<Twits> {
 		console.log('Query: getMemberTwits');
 		return await this.twitService.getMemberTwits(viewerId, input);

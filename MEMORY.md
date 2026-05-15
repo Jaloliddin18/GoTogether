@@ -1,12 +1,29 @@
 # 같이Go Backend — Session Memory
 
 ## Last Updated
-2026-05-08
+2026-05-15
 
 ## Current Branch
 develop
 
 ## Implementation Snapshot
+
+### Twit read API and member counter hardening (2026-05-15)
+- `getTwits`, `getTwit`, and `getMemberTwits` are available through `WithoutGuard` for guest access.
+- `getTwits` no longer applies logged-in follow-feed filtering.
+  - current behavior returns global twit list (`deletedAt: null`) with optional `search.memberId` and `search.text`.
+- Twit `memberData` null-safety fix added in aggregation:
+  - member numeric counters are normalized with `$ifNull` fallback to `0`.
+  - prevents GraphQL crash:
+    - `Cannot return null for non-nullable field Member.memberTwits.`
+- Twit module/service cleanup:
+  - removed `Follow` model dependency from Twit path after feed-filter removal.
+- One-time DB script added and executed:
+  - `npm run backfill:member-counters`
+  - result: `matched=7`, `modified=2`
+- Startup health check added:
+  - `MemberHealthCheckService` runs on module init.
+  - reports malformed member counter fields (sample limit 10) without writing to DB.
 
 ### BookInventory pickup model (fixed gripper)
 - Removed old fork/container fields:

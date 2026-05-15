@@ -17,17 +17,25 @@ import { Direction, Message } from '../../libs/enums/common.enum';
 import { T } from '../../libs/types/common';
 import { lookupMember, shapeIntoMongoObjectId } from '../../libs/config';
 
-interface FollowDoc {
-	followerId: ObjectId;
-	followingId: ObjectId;
-}
+const normalizeMemberDataCounters = {
+	$addFields: {
+		'memberData.memberBooks': { $ifNull: ['$memberData.memberBooks', 0] },
+		'memberData.memberTwits': { $ifNull: ['$memberData.memberTwits', 0] },
+		'memberData.memberFollowers': { $ifNull: ['$memberData.memberFollowers', 0] },
+		'memberData.memberFollowings': { $ifNull: ['$memberData.memberFollowings', 0] },
+		'memberData.memberPoints': { $ifNull: ['$memberData.memberPoints', 0] },
+		'memberData.memberLikes': { $ifNull: ['$memberData.memberLikes', 0] },
+		'memberData.memberViews': { $ifNull: ['$memberData.memberViews', 0] },
+		'memberData.memberComments': { $ifNull: ['$memberData.memberComments', 0] },
+		'memberData.memberRank': { $ifNull: ['$memberData.memberRank', 0] },
+		'memberData.memberWarnings': { $ifNull: ['$memberData.memberWarnings', 0] },
+		'memberData.memberBlocks': { $ifNull: ['$memberData.memberBlocks', 0] },
+	},
+};
 
 @Injectable()
 export class TwitService {
-	constructor(
-		@InjectModel('Twit') private readonly twitModel: Model<Twit>,
-		@InjectModel('Follow') private readonly followModel: Model<FollowDoc>,
-	) {}
+	constructor(@InjectModel('Twit') private readonly twitModel: Model<Twit>) {}
 
 	public async createTwit(
 		memberId: ObjectId,
@@ -56,6 +64,7 @@ export class TwitService {
 				{ $match: { _id: input._id, deletedAt: null } },
 				lookupMember,
 				{ $unwind: '$memberData' },
+				normalizeMemberDataCounters,
 			])
 			.exec();
 		const targetTwit: Twit = result[0];
@@ -64,18 +73,17 @@ export class TwitService {
 		return targetTwit;
 	}
 
-	public async getTwits(memberId: ObjectId, input: TwitsInquiry): Promise<Twits> {
-		const followingIds: ObjectId[] = await this.followModel
-			.distinct('followingId', { followerId: memberId })
-			.exec();
-		const feedMemberIds: ObjectId[] = [memberId, ...followingIds];
+	public async getTwits(input: TwitsInquiry): Promise<Twits> {
 		const sort: T = {
 			[input?.sort ?? 'createdAt']: input?.direction ?? Direction.DESC,
 		};
 		const match: T = {
-			memberId: { $in: feedMemberIds },
 			deletedAt: null,
 		};
+
+		if (input.search?.memberId) {
+			match.memberId = shapeIntoMongoObjectId(input.search.memberId);
+		}
 
 		if (input.search?.text) {
 			match.text = { $regex: new RegExp(input.search.text.trim(), 'i') };
@@ -92,6 +100,7 @@ export class TwitService {
 							{ $limit: input.limit },
 							lookupMember,
 							{ $unwind: '$memberData' },
+							normalizeMemberDataCounters,
 						],
 						metaCounter: [{ $count: 'total' }],
 					},
@@ -135,6 +144,7 @@ export class TwitService {
 							{ $limit: input.limit },
 							lookupMember,
 							{ $unwind: '$memberData' },
+							normalizeMemberDataCounters,
 						],
 						metaCounter: [{ $count: 'total' }],
 					},
@@ -217,6 +227,7 @@ export class TwitService {
 							{ $limit: input.limit },
 							lookupMember,
 							{ $unwind: '$memberData' },
+							normalizeMemberDataCounters,
 						],
 						metaCounter: [{ $count: 'total' }],
 					},
