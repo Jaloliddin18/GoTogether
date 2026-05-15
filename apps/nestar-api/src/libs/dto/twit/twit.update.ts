@@ -1,5 +1,5 @@
 import { Field, InputType } from '@nestjs/graphql';
-import { IsNotEmpty, IsOptional, Length } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsNotEmpty, IsOptional, Length } from 'class-validator';
 import type { ObjectId } from 'mongoose';
 
 @InputType()
@@ -13,7 +13,9 @@ export class TwitUpdate {
 	@Field(() => String, { nullable: true })
 	text?: string;
 
+	@IsArray()
+	@ArrayMaxSize(3)
 	@IsOptional()
-	@Field(() => String, { nullable: true })
-	image?: string;
+	@Field(() => [String], { nullable: true })
+	images?: string[];
 }

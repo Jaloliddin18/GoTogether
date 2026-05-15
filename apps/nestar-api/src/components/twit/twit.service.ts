@@ -77,7 +77,7 @@ export class TwitService {
 			return await this.twitModel.create({
 				memberId,
 				text,
-				image: input.image ?? '',
+				images: input.images ?? [],
 			});
 		} catch (err: unknown) {
 			const msg = err instanceof Error ? err.message : String(err);
@@ -320,7 +320,7 @@ export class TwitService {
 	public async updateTwitByAdmin(input: TwitUpdate): Promise<Twit> {
 		const update: T = {};
 		if (input.text !== undefined) update.text = input.text.trim();
-		if (input.image !== undefined) update.image = input.image;
+		if (input.images !== undefined) update.images = input.images;
 
 		if (!Object.keys(update).length)
 			throw new BadRequestException(Message.BAD_REQUEST);

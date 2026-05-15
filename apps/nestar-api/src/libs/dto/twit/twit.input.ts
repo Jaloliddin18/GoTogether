@@ -1,5 +1,5 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
-import { IsBoolean, IsIn, IsNotEmpty, IsOptional, Length, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsNotEmpty, IsOptional, Length, Min } from 'class-validator';
 import type { ObjectId } from 'mongoose';
 import { availableTwitSorts } from '../../config';
 import { Direction } from '../../enums/common.enum';
@@ -12,9 +12,11 @@ export class CreateTwitInput {
 	@Field(() => String)
 	text: string;
 
+	@IsArray()
+	@ArrayMaxSize(3)
 	@IsOptional()
-	@Field(() => String, { nullable: true })
-	image?: string;
+	@Field(() => [String], { nullable: true })
+	images?: string[];
 }
 
 @InputType()

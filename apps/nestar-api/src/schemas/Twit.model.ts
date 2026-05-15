@@ -15,9 +15,9 @@ const TwitSchema = new Schema(
 			maxlength: 280,
 		},
 
-		image: {
-			type: String,
-			default: '',
+		images: {
+			type: [String],
+			default: [],
 		},
 
 		likeCount: {

@@ -13,8 +13,8 @@ export class Twit {
 	@Field(() => String)
 	text: string;
 
-	@Field(() => String, { nullable: true })
-	image?: string;
+	@Field(() => [String], { nullable: true })
+	images?: string[];
 
 	@Field(() => Int)
 	likeCount: number;
