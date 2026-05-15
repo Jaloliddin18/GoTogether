@@ -253,15 +253,30 @@ export class TwitService {
 			likeGroup: LikeGroup.TWIT,
 		};
 		const modifier = await this.likeService.toggleLike(input);
-		const result = await this.twitStatsEditor({
-			_id: twitId,
-			targetKey: 'likeCount',
-			modifier,
-		});
+		const result = await this.twitModel
+			.findOneAndUpdate(
+				{ _id: twitId, deletedAt: null },
+				[
+					{
+						$set: {
+							likeCount: {
+								$max: [
+									{
+										$add: [{ $ifNull: ['$likeCount', 0] }, modifier],
+									},
+									0,
+								],
+							},
+						},
+					},
+				],
+				{ new: true },
+			)
+			.exec();
 
 		if (!result)
 			throw new InternalServerErrorException(Message.SOMETHING_WENT_WRONG);
-		return result;
+		return this.getTwit(memberId, { _id: twitId });
 	}
 
 	public async deleteTwit(memberId: ObjectId, twitId: ObjectId): Promise<Twit> {
@@ -348,18 +363,4 @@ export class TwitService {
 		return result;
 	}
 
-	private async twitStatsEditor(input: {
-		_id: ObjectId;
-		targetKey: string;
-		modifier: number;
-	}): Promise<Twit | null> {
-		const { _id, targetKey, modifier } = input;
-		return await this.twitModel
-			.findOneAndUpdate(
-				{ _id, deletedAt: null },
-				{ $inc: { [targetKey]: modifier } },
-				{ new: true },
-			)
-			.exec();
-	}
 }
