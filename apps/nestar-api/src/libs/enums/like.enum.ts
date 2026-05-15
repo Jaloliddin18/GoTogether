@@ -5,6 +5,7 @@ export enum LikeGroup {
 	BOOK = 'BOOK',
 	ARTICLE = 'ARTICLE',
 	TWIT = 'TWIT',
+	TWIT_COMMENT = 'TWIT_COMMENT',
 }
 registerEnumType(LikeGroup, {
 	name: 'LikeGroup',

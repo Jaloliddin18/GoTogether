@@ -15,7 +15,10 @@ import { Member } from '../../libs/dto/member/member';
 import { MemberType } from '../../libs/enums/member.enum';
 import { Direction, Message } from '../../libs/enums/common.enum';
 import { T } from '../../libs/types/common';
-import { lookupMember, shapeIntoMongoObjectId } from '../../libs/config';
+import { lookupAuthMemberLiked, lookupMember, shapeIntoMongoObjectId } from '../../libs/config';
+import { LikeService } from '../like/like.service';
+import { LikeInput } from '../../libs/dto/like/like.input';
+import { LikeGroup } from '../../libs/enums/like.enum';
 
 interface TwitDoc {
 	_id: ObjectId;
@@ -29,7 +32,6 @@ interface TwitCommentDoc {
 	text: string;
 	parentCommentId?: ObjectId | null;
 	depth: number;
-	likes: ObjectId[];
 	likeCount: number;
 	deletedAt?: Date | null;
 }
@@ -40,6 +42,7 @@ export class TwitCommentService {
 		@InjectModel('TwitComment')
 		private readonly twitCommentModel: Model<TwitCommentDoc>,
 		@InjectModel('Twit') private readonly twitModel: Model<TwitDoc>,
+		private readonly likeService: LikeService,
 	) {}
 
 	public async createTwitComment(
@@ -108,16 +111,17 @@ export class TwitCommentService {
 						list: [
 							{ $skip: (input.page - 1) * input.limit },
 							{ $limit: input.limit },
+							lookupAuthMemberLiked(viewerId),
+							{
+								$addFields: {
+									meLiked: { $gt: [{ $size: '$meLiked' }, 0] },
+								},
+							},
 							lookupMember,
 							{
 								$unwind: {
 									path: '$memberData',
 									preserveNullAndEmptyArrays: true,
-								},
-							},
-							{
-								$addFields: {
-									meLiked: viewerId ? { $in: [viewerId, '$likes'] } : false,
 								},
 							},
 						],
@@ -184,35 +188,49 @@ export class TwitCommentService {
 		memberId: ObjectId,
 		commentId: ObjectId,
 	): Promise<TwitComment> {
-		const target: TwitCommentDoc = await this.twitCommentModel
+		const target = await this.twitCommentModel
 			.findOne({ _id: commentId, deletedAt: null })
 			.exec();
 		if (!target) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
-		if (target.deletedAt) throw new BadRequestException(Message.BAD_REQUEST);
 
-		const alreadyLiked = target.likes.some(
-			(likeMemberId: ObjectId) => likeMemberId.toString() === memberId.toString(),
-		);
-
-		const result = alreadyLiked
-			? await this.twitCommentModel
-					.findOneAndUpdate(
-						{ _id: commentId, likes: memberId, deletedAt: null },
-						{ $pull: { likes: memberId }, $inc: { likeCount: -1 } },
-						{ new: true },
-					)
-					.exec()
-			: await this.twitCommentModel
-					.findOneAndUpdate(
-						{ _id: commentId, likes: { $ne: memberId }, deletedAt: null },
-						{ $addToSet: { likes: memberId }, $inc: { likeCount: 1 } },
-						{ new: true },
-					)
-					.exec();
-
+		const likeInput: LikeInput = {
+			memberId,
+			likeRefId: commentId,
+			likeGroup: LikeGroup.TWIT_COMMENT,
+		};
+		const modifier = await this.likeService.toggleLike(likeInput);
+		const result = await this.twitCommentModel
+			.findOneAndUpdate(
+				{ _id: commentId, deletedAt: null },
+				{ $inc: { likeCount: modifier } },
+				{ new: true },
+			)
+			.exec();
 		if (!result)
 			throw new InternalServerErrorException(Message.SOMETHING_WENT_WRONG);
-		return result as unknown as TwitComment;
+		return this.getTwitComment(memberId, commentId);
+	}
+
+	private async getTwitComment(
+		memberId: ObjectId | null,
+		commentId: ObjectId,
+	): Promise<TwitComment> {
+		const result = await this.twitCommentModel
+			.aggregate([
+				{ $match: { _id: commentId, deletedAt: null } },
+				lookupAuthMemberLiked(memberId),
+				{
+					$addFields: {
+						meLiked: { $gt: [{ $size: '$meLiked' }, 0] },
+					},
+				},
+				lookupMember,
+				{ $unwind: { path: '$memberData', preserveNullAndEmptyArrays: true } },
+			])
+			.exec();
+		const target: TwitComment = result[0];
+		if (!target) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+		return target;
 	}
 
 	public async removeTwitCommentByAdmin(commentId: ObjectId): Promise<TwitComment> {

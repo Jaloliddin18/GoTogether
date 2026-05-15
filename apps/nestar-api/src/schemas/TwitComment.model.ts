@@ -32,11 +32,6 @@ const TwitCommentSchema = new Schema(
 			default: 0,
 		},
 
-		likes: {
-			type: [{ type: Schema.Types.ObjectId, ref: 'Member' }],
-			default: [],
-		},
-
 		likeCount: {
 			type: Number,
 			default: 0,

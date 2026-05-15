@@ -22,9 +22,6 @@ export class TwitComment {
 	@Field(() => Int)
 	depth: number;
 
-	@Field(() => [String])
-	likes: ObjectId[];
-
 	@Field(() => Int)
 	likeCount: number;
 
