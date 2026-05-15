@@ -30,6 +30,11 @@ const TwitSchema = new Schema(
 			default: 0,
 		},
 
+		viewCount: {
+			type: Number,
+			default: 0,
+		},
+
 		deletedAt: {
 			type: Date,
 			default: null,

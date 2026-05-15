@@ -34,10 +34,13 @@ export class TwitResolver {
 
 	@UseGuards(WithoutGuard)
 	@Query(() => Twit)
-	public async getTwit(@Args('input') input: TwitInquiry): Promise<Twit> {
+	public async getTwit(
+		@Args('input') input: TwitInquiry,
+		@AuthMember('_id') memberId: ObjectId | null,
+	): Promise<Twit> {
 		console.log('Query: getTwit');
 		input._id = shapeIntoMongoObjectId(input._id);
-		return await this.twitService.getTwit(input);
+		return await this.twitService.getTwit(memberId, input);
 	}
 
 	@UseGuards(WithoutGuard)

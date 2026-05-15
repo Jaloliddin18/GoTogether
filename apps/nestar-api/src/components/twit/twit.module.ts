@@ -5,12 +5,14 @@ import { TwitResolver } from './twit.resolver';
 import { TwitService } from './twit.service';
 import TwitSchema from '../../schemas/Twit.model';
 import FollowSchema from '../../schemas/Follow.model';
+import { ViewModule } from '../view/view.module';
 
 @Module({
 	imports: [
 		MongooseModule.forFeature([{ name: 'Twit', schema: TwitSchema }]),
 		MongooseModule.forFeature([{ name: 'Follow', schema: FollowSchema }]),
 		AuthModule,
+		ViewModule,
 	],
 	providers: [TwitResolver, TwitService],
 	exports: [TwitService],

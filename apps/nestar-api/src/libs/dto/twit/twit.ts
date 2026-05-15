@@ -22,6 +22,9 @@ export class Twit {
 	@Field(() => Int)
 	likeCount: number;
 
+	@Field(() => Int)
+	viewCount: number;
+
 	@Field(() => Date, { nullable: true })
 	deletedAt?: Date;
 

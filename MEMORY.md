@@ -25,6 +25,14 @@ develop
   - `MemberHealthCheckService` runs on module init.
   - reports malformed member counter fields (sample limit 10) without writing to DB.
 
+### Twit click-based view tracking (2026-05-15)
+- `getTwit` now applies view tracking directly (no separate increment mutation API).
+- Uses existing `ViewService.recordView` pattern, aligned with existing Book + View flow (`BookService` + `ViewGroup.BOOK`) as reference.
+- Added `TWIT` in `ViewGroup` enum.
+- Added `viewCount` field to Twit schema/model and GraphQL DTO.
+- Added `$ifNull` normalization for `viewCount` in Twit aggregate pipelines to protect older docs with missing values.
+- Wired `ViewModule` into `TwitModule`.
+
 ### BookInventory pickup model (fixed gripper)
 - Removed old fork/container fields:
   - `mastHeightCm`

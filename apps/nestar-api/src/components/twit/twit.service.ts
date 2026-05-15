@@ -15,8 +15,10 @@ import {
 import { TwitUpdate } from '../../libs/dto/twit/twit.update';
 import { Direction, Message } from '../../libs/enums/common.enum';
 import { TwitFeedType } from '../../libs/enums/twit.enum';
+import { ViewGroup } from '../../libs/enums/view.enum';
 import { T } from '../../libs/types/common';
 import { lookupMember, shapeIntoMongoObjectId } from '../../libs/config';
+import { ViewService } from '../view/view.service';
 
 const normalizeMemberDataCounters = {
 	$addFields: {
@@ -34,11 +36,19 @@ const normalizeMemberDataCounters = {
 	},
 };
 
+const normalizeTwitCounters = {
+	$addFields: {
+		likeCount: { $ifNull: ['$likeCount', 0] },
+		viewCount: { $ifNull: ['$viewCount', 0] },
+	},
+};
+
 @Injectable()
 export class TwitService {
 	constructor(
 		@InjectModel('Twit') private readonly twitModel: Model<Twit>,
 		@InjectModel('Follow') private readonly followModel: Model<{ followingId: ObjectId }>,
+		private readonly viewService: ViewService,
 	) {}
 
 	public async createTwit(
@@ -62,10 +72,14 @@ export class TwitService {
 		}
 	}
 
-	public async getTwit(input: TwitInquiry): Promise<Twit> {
+	public async getTwit(
+		memberId: ObjectId | null,
+		input: TwitInquiry,
+	): Promise<Twit> {
 		const result = await this.twitModel
 			.aggregate([
 				{ $match: { _id: input._id, deletedAt: null } },
+				normalizeTwitCounters,
 				lookupMember,
 				{ $unwind: '$memberData' },
 				normalizeMemberDataCounters,
@@ -74,6 +88,26 @@ export class TwitService {
 		const targetTwit: Twit = result[0];
 		if (!targetTwit)
 			throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+
+		if (memberId) {
+			const viewInput = {
+				memberId,
+				viewRefId: input._id,
+				viewGroup: ViewGroup.TWIT,
+			};
+			const newView = await this.viewService.recordView(viewInput);
+			if (newView) {
+				await this.twitModel
+					.findOneAndUpdate(
+						{ _id: input._id, deletedAt: null },
+						{ $inc: { viewCount: 1 } },
+						{ new: true },
+					)
+					.exec();
+				targetTwit.viewCount = (targetTwit.viewCount ?? 0) + 1;
+			}
+		}
+
 		return targetTwit;
 	}
 
@@ -128,6 +162,7 @@ export class TwitService {
 						list: [
 							{ $skip: (input.page - 1) * input.limit },
 							{ $limit: input.limit },
+							normalizeTwitCounters,
 							lookupMember,
 							{ $unwind: '$memberData' },
 							normalizeMemberDataCounters,
@@ -172,6 +207,7 @@ export class TwitService {
 						list: [
 							{ $skip: (input.page - 1) * input.limit },
 							{ $limit: input.limit },
+							normalizeTwitCounters,
 							lookupMember,
 							{ $unwind: '$memberData' },
 							normalizeMemberDataCounters,
@@ -255,6 +291,7 @@ export class TwitService {
 						list: [
 							{ $skip: (input.page - 1) * input.limit },
 							{ $limit: input.limit },
+							normalizeTwitCounters,
 							lookupMember,
 							{ $unwind: '$memberData' },
 							normalizeMemberDataCounters,
