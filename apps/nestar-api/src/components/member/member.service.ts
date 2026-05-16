@@ -234,13 +234,12 @@ export class MemberService {
 	public async memberStatsEditor(input: StatisticModifier): Promise<Member> {
 		console.log('executed');
 		const { _id, targetKey, modifier } = input;
+		const filter: T = { _id };
+		if (modifier < 0) filter[targetKey] = { $gt: 0 };
 		return await this.memberModel
 			.findOneAndUpdate(
-				{ _id },
-				{
-					$inc: { [targetKey]: modifier },
-					// dynamically increasing and decreasing the target value
-				},
+				filter,
+				{ $inc: { [targetKey]: modifier } },
 				{ new: true },
 			)
 			.exec();

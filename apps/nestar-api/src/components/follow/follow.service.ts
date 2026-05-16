@@ -44,7 +44,18 @@ export class FollowService {
 			.exec();
 		if (existing) return existing as Follower;
 
-		return await this.registerFollow(followerId, followingId);
+		const follow = await this.registerFollow(followerId, followingId);
+		await this.memberService.memberStatsEditor({
+			_id: followingId,
+			targetKey: 'memberFollowers',
+			modifier: +1,
+		});
+		await this.memberService.memberStatsEditor({
+			_id: followerId,
+			targetKey: 'memberFollowings',
+			modifier: +1,
+		});
+		return follow;
 	}
 
 	public async unsubscribe(
@@ -60,6 +71,16 @@ export class FollowService {
 			})
 			.exec();
 		if (!result) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+		await this.memberService.memberStatsEditor({
+			_id: followingId,
+			targetKey: 'memberFollowers',
+			modifier: -1,
+		});
+		await this.memberService.memberStatsEditor({
+			_id: followerId,
+			targetKey: 'memberFollowings',
+			modifier: -1,
+		});
 		return result;
 	}
 
