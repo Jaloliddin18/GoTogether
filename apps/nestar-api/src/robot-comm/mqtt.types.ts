@@ -1,4 +1,4 @@
-export interface MqttCommandPayload {
+export interface MqttDeliveryCommandPayload {
 	type: 'DELIVERY_TASK';
 	requestId: string;
 	book: {
@@ -23,6 +23,21 @@ export interface MqttCommandPayload {
 		theta: number;
 	};
 }
+
+export interface MqttReturnToDockCommandPayload {
+	type: 'RETURN_TO_DOCK';
+	requestId: string;
+	dock: {
+		floorId: string;
+		x: number;
+		y: number;
+		theta: number;
+	};
+}
+
+export type MqttCommandPayload =
+	| MqttDeliveryCommandPayload
+	| MqttReturnToDockCommandPayload;
 
 export interface MqttCancelCommandPayload {
 	type: 'CANCEL_TASK';

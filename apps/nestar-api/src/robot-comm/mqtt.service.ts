@@ -2,7 +2,6 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { InjectModel } from '@nestjs/mongoose';
 import { connect, MqttClient } from 'mqtt';
 import { Model, ObjectId } from 'mongoose';
-import { Server } from 'socket.io';
 import { shapeIntoMongoObjectId } from '../libs/config';
 import { BookInventory } from '../libs/dto/book-inventory/book-inventory';
 import { RequestTask } from '../libs/dto/request/request';
@@ -30,6 +29,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		RequestStatus.FAILED,
 		RequestStatus.CANCELLED,
 	];
+	private readonly postCompletionTelemetryWindowMs = 15 * 60 * 1000;
 
 	constructor(
 		private readonly robotGateway: RobotGateway,
@@ -267,7 +267,10 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				.exec();
 			this.clearOfflineTimeout(payloadRobotId);
 
-			const activeRequest = await this.findActiveRequestByRobot(robot._id);
+			const activeRequest = await this.resolveTelemetryRequest({
+				robot,
+				payloadRequestId: payload.requestId,
+			});
 			if (!activeRequest) {
 				this.logger.log(
 					`No active request for robotId=${payloadRobotId}; skipping robotStatus/request updates`,
@@ -285,7 +288,13 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			let currentRequest = activeRequest;
 			let requestStatusChanged = false;
 
-			if (!mappedRequestStatus) {
+			if (this.isTerminalRequestStatus(activeRequest.status)) {
+				if (mappedRequestStatus && mappedRequestStatus !== activeRequest.status) {
+					this.logger.log(
+						`Ignoring request status transition ${activeRequest.status} -> ${mappedRequestStatus} for terminal requestId=${requestId}`,
+					);
+				}
+			} else if (!mappedRequestStatus) {
 				this.logger.warn(
 					`Unknown RequestStatus mapping for state=${payload.state}; skipping request status update`,
 				);
@@ -337,7 +346,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			this.emitToRequestRoom(requestId, 'robotStatus', {
 				robotId: payloadRobotId,
 				requestId,
-				status: payload.state,
+				status: mappedRobotStatus ?? payload.state,
 				message: payload.message,
 				battery: payload.battery,
 				timestamp: payload.timestamp,
@@ -451,7 +460,10 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				.exec();
 			this.clearOfflineTimeout(payloadRobotId);
 
-			const activeRequest = await this.findActiveRequestByRobot(robot._id);
+			const activeRequest = await this.resolveTelemetryRequest({
+				robot,
+				payloadRequestId: payload.requestId,
+			});
 			if (!activeRequest) {
 				this.logger.log(
 					`No active request for robotId=${payloadRobotId}; skipping robotPosition emit`,
@@ -465,9 +477,9 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				this.logger.log(
 					`Skipping offline timeout start for robotId=${payloadRobotId}, requestId=${requestId}, status=${activeRequest.status}`,
 				);
-				return;
+			} else {
+				this.startOfflineTimeout(payloadRobotId, requestId);
 			}
-			this.startOfflineTimeout(payloadRobotId, requestId);
 
 			this.emitToRequestRoom(requestId, 'robotPosition', {
 				robotId: payloadRobotId,
@@ -648,12 +660,92 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		return await this.requestModel
 			.findOne({
 				robotId: robotObjectId,
-				status: {
-					$nin: [...this.terminalRequestStatuses, RequestStatus.READY],
-				},
+				status: { $nin: this.terminalRequestStatuses },
 			})
 			.sort({ updatedAt: -1 })
 			.exec();
+	}
+
+	private async resolveTelemetryRequest(input: {
+		robot: Robot;
+		payloadRequestId?: string;
+	}): Promise<RequestTask | null> {
+		const activeStatusFilter = { $nin: this.terminalRequestStatuses };
+		const payloadRequestId = input.payloadRequestId?.trim();
+
+		if (payloadRequestId) {
+			try {
+				const requestFromPayload = await this.requestModel
+					.findOne({
+						_id: shapeIntoMongoObjectId(payloadRequestId),
+						robotId: input.robot._id,
+						status: activeStatusFilter,
+					})
+					.exec();
+				if (requestFromPayload) {
+					this.logger.log(
+						`Resolved telemetry requestId=${requestFromPayload._id} via payload.requestId for robotId=${input.robot.robotId}`,
+					);
+					return requestFromPayload;
+				}
+
+				const completedRequestFromPayload = await this.requestModel
+					.findOne({
+						_id: shapeIntoMongoObjectId(payloadRequestId),
+						robotId: input.robot._id,
+						status: RequestStatus.COMPLETED,
+					})
+					.exec();
+				if (
+					completedRequestFromPayload &&
+					this.isWithinPostCompletionTelemetryWindow(
+						completedRequestFromPayload.updatedAt,
+					)
+				) {
+					this.logger.log(
+						`Resolved telemetry requestId=${completedRequestFromPayload._id} via payload.requestId for post-completion robotId=${input.robot.robotId}`,
+					);
+					return completedRequestFromPayload;
+				}
+			} catch {
+				this.logger.warn(
+					`Invalid payload.requestId format: ${payloadRequestId}`,
+				);
+			}
+		}
+
+		if (input.robot.currentRequestId) {
+			const requestFromRobot = await this.requestModel
+				.findOne({
+					_id: input.robot.currentRequestId,
+					robotId: input.robot._id,
+					status: activeStatusFilter,
+				})
+				.exec();
+			if (requestFromRobot) {
+				this.logger.log(
+					`Resolved telemetry requestId=${requestFromRobot._id} via robot.currentRequestId for robotId=${input.robot.robotId}`,
+				);
+				return requestFromRobot;
+			}
+		}
+
+		const requestFromFallback = await this.findActiveRequestByRobot(input.robot._id);
+		if (requestFromFallback) {
+			this.logger.log(
+				`Resolved telemetry requestId=${requestFromFallback._id} via active request fallback for robotId=${input.robot.robotId}`,
+			);
+		}
+		return requestFromFallback;
+	}
+
+	private isWithinPostCompletionTelemetryWindow(
+		updatedAt?: Date,
+	): boolean {
+		if (!updatedAt) return false;
+		return (
+			Date.now() - updatedAt.getTime() <= this.postCompletionTelemetryWindowMs
+		);
 	}
 
 	private isTerminalRequestStatus(status: RequestStatus | string): boolean {
@@ -823,7 +915,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		event: string,
 		payload: Record<string, unknown>,
 	): void {
-		const server: Server | null = this.robotGateway.getServer();
+		const server: any = this.robotGateway.getServer();
 		if (!server) {
 			this.logger.warn('WebSocket server not ready');
 			return;

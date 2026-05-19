@@ -7,6 +7,7 @@ import RobotSchema from '../../schemas/Robot.model';
 import BookInventorySchema from '../../schemas/BookInventory.model';
 import { RequestResolver } from './request.resolver';
 import { RequestService } from './request.service';
+import { SocketModule } from '../../socket/socket.module';
 
 @Module({
 	imports: [
@@ -17,6 +18,7 @@ import { RequestService } from './request.service';
 		]),
 		MongooseModule.forFeature([{ name: 'Robot', schema: RobotSchema }]),
 		AuthModule,
+		SocketModule,
 	],
 	providers: [RequestResolver, RequestService],
 	exports: [RequestService],

@@ -12,7 +12,7 @@ interface JoinRequestPayload {
 	requestId: string;
 }
 
-@WebSocketGateway({ transports: ['websocket'], secure: false })
+@WebSocketGateway(3009, { transports: ['websocket'], cors: { origin: '*' }, secure: false })
 export class RobotGateway implements OnGatewayInit {
 	private readonly logger: Logger = new Logger('RobotGateway');
 	private readonly requestClients: Map<string, Set<WebSocket>> = new Map<

@@ -1,10 +1,31 @@
 # 같이Go Backend — Session Memory
 
 ## Last Updated
-2026-05-15
+2026-05-19
 
 ## Current Branch
 develop
+
+## Session Update (2026-05-19)
+
+### Completed
+- Frontend realtime completion gap was traced to backend + simulator behavior and closed with lifecycle-safe telemetry updates.
+- `updateRequestStatus(COMPLETED)` flow now supports automatic post-completion lifecycle:
+  - release robot from completed request
+  - auto-assign next queued request when available
+  - when no queued request exists, transition robot to `RETURNING` and publish `RETURN_TO_DOCK`.
+- MQTT request resolution now supports post-completion telemetry continuity for the same request room (windowed), so frontend can track return movement without manual refresh.
+- Added terminal-status guardrails so terminal request state is not downgraded by later non-terminal telemetry.
+- Extended MQTT command contracts to include `RETURN_TO_DOCK`.
+- Reworked `scripts/simulateRobotDelivery.ts` into dual mode:
+  - one-shot/manual mode retained
+  - persistent listener mode added (`--listen=true`) subscribing to `robot/<robotId>/command`
+  - supports `DELIVERY_TASK` and `RETURN_TO_DOCK`
+  - mode inference from command payload with safe fallbacks
+  - ignores duplicates / busy overlap and keeps continuous pose + `state` status publishing.
+
+### Verification
+- Backend build passed (`npm run build`) after lifecycle and simulator listener changes.
 
 ## Implementation Snapshot
 

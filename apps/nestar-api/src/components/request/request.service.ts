@@ -44,7 +44,16 @@ import { MqttRobotService } from '../../robot-comm/mqtt.service';
 import {
 	MqttCancelCommandPayload,
 	MqttCommandPayload,
+	MqttReturnToDockCommandPayload,
 } from '../../robot-comm/mqtt.types';
+import { RobotGateway } from '../../socket/robot.gateway';
+
+const CHARGING_DOCK_DESTINATION = {
+	floorId: 'floor_1',
+	x: 53.529,
+	y: 9.706,
+	theta: 0,
+} as const;
 
 @Injectable()
 export class RequestService {
@@ -55,6 +64,7 @@ export class RequestService {
 		private readonly bookInventoryModel: Model<BookInventory>,
 		@InjectModel('Robot') private readonly robotModel: Model<Robot>,
 		private readonly mqttRobotService: MqttRobotService,
+		private readonly robotGateway: RobotGateway,
 	) {}
 
 	public async createDeliveryRequest(
@@ -324,17 +334,6 @@ export class RequestService {
 			}
 		}
 
-		if (
-			target.robotId &&
-			[
-				RequestStatus.COMPLETED,
-				RequestStatus.FAILED,
-				RequestStatus.CANCELLED,
-			].includes(input.status)
-		) {
-			await this.releaseRobot(target.robotId);
-		}
-
 		const result = await this.requestModel
 			.findOneAndUpdate(
 				{ _id: requestId },
@@ -348,6 +347,28 @@ export class RequestService {
 			)
 			.exec();
 		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
+
+		this.emitRequestUpdatedPayload(result);
+
+		if (
+			target.robotId &&
+			[
+				RequestStatus.COMPLETED,
+				RequestStatus.FAILED,
+				RequestStatus.CANCELLED,
+			].includes(input.status)
+		) {
+			const releasedRobot = await this.releaseRobot(target.robotId);
+			if (releasedRobot) {
+				const nextAssignedRequest = await this.tryAssignNextQueuedRequest(releasedRobot);
+				if (nextAssignedRequest) {
+					this.emitRequestUpdatedPayload(nextAssignedRequest);
+				} else if (input.status === RequestStatus.COMPLETED) {
+					await this.startRobotReturnToDock(releasedRobot, result._id);
+				}
+			}
+		}
+
 		return result;
 	}
 
@@ -718,8 +739,8 @@ export class RequestService {
 		return total - sold - reserved - borrowed;
 	}
 
-	private async releaseRobot(robotId: ObjectId): Promise<void> {
-		await this.robotModel
+	private async releaseRobot(robotId: ObjectId): Promise<Robot | null> {
+		return await this.robotModel
 			.findOneAndUpdate(
 				{ _id: robotId },
 				{
@@ -729,6 +750,126 @@ export class RequestService {
 				{ new: true },
 			)
 			.exec();
+	}
+
+	private emitRequestUpdatedPayload(request: RequestTask): void {
+		const latestTimeline = request.timeline?.[request.timeline.length - 1];
+		this.robotGateway.emitRequestUpdated(String(request._id), {
+			requestId: String(request._id),
+			status: request.status,
+			message: latestTimeline?.message ?? '',
+			timestamp:
+				latestTimeline?.timestamp instanceof Date
+					? latestTimeline.timestamp.toISOString()
+					: new Date().toISOString(),
+			timeline: request.timeline ?? [],
+		});
+	}
+
+	private async tryAssignNextQueuedRequest(robot: Robot): Promise<RequestTask | null> {
+		const nextQueuedRequest = await this.requestModel
+			.findOneAndUpdate(
+				{
+					status: RequestStatus.QUEUED,
+					$or: [{ robotId: null }, { robotId: { $exists: false } }],
+				},
+				{
+					$set: {
+						status: RequestStatus.ASSIGNED,
+						robotId: robot._id,
+					},
+					$push: {
+						timeline: this.buildTimelineItem(
+							RequestStatus.ASSIGNED,
+							'Robot assigned for delivery request.',
+						),
+					},
+				},
+				{ new: true },
+			)
+			.sort({ createdAt: 1 })
+			.exec();
+
+		if (!nextQueuedRequest) {
+			return null;
+		}
+
+		await this.robotModel
+			.findOneAndUpdate(
+				{ _id: robot._id },
+				{
+					$set: {
+						status: RobotStatus.ASSIGNED,
+						currentRequestId: nextQueuedRequest._id,
+					},
+				},
+				{ new: true },
+			)
+			.exec();
+
+		this.mqttRobotService.subscribeToRobotTopics(robot.robotId);
+
+		const [book, sourceInventory] = await Promise.all([
+			this.bookModel
+				.findOne({
+					_id: nextQueuedRequest.bookId,
+					deletedAt: null,
+					bookStatus: { $ne: BookStatus.DELETED },
+				})
+				.lean()
+				.exec(),
+			this.bookInventoryModel
+				.findOne({
+					_id: nextQueuedRequest.sourceInventoryId,
+					deletedAt: null,
+				})
+				.lean()
+				.exec(),
+		]);
+
+		if (book && sourceInventory) {
+			this.mqttRobotService.publishCommand(
+				robot.robotId,
+				this.buildDeliveryCommandPayload(book, sourceInventory, nextQueuedRequest),
+			);
+		}
+
+		return nextQueuedRequest;
+	}
+
+	private async startRobotReturnToDock(
+		robot: Robot,
+		completedRequestId: ObjectId,
+	): Promise<void> {
+		await this.robotModel
+			.findOneAndUpdate(
+				{ _id: robot._id },
+				{
+					$set: {
+						status: RobotStatus.RETURNING,
+						currentRequestId: null,
+						isOnline: true,
+						lastSeenAt: new Date(),
+					},
+				},
+				{ new: true },
+			)
+			.exec();
+
+		const requestId = String(completedRequestId);
+		const timestamp = new Date().toISOString();
+		this.robotGateway.emitRobotStatus(requestId, {
+			robotId: robot.robotId,
+			requestId,
+			status: RobotStatus.RETURNING,
+			message: 'Returning to charging dock.',
+			timestamp,
+		});
+
+		this.mqttRobotService.publishCommand(
+			robot.robotId,
+			this.buildReturnToDockCommandPayload(requestId),
+		);
 	}
 
 	private buildDeliveryCommandPayload(
@@ -762,6 +903,16 @@ export class RequestService {
 				y: request.destination.y,
 				theta: request.destination.theta,
 			},
+		};
+	}
+
+	private buildReturnToDockCommandPayload(
+		requestId: string,
+	): MqttReturnToDockCommandPayload {
+		return {
+			type: 'RETURN_TO_DOCK',
+			requestId,
+			dock: CHARGING_DOCK_DESTINATION,
 		};
 	}
 }

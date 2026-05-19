@@ -104,3 +104,12 @@ RequestStatus:
 - `COMPLETED`
 - `FAILED`
 - `CANCELLED`
+
+---
+
+## Session Update (2026-05-19) — Command-driven simulator expectation
+
+- `scripts/simulateRobotDelivery.ts` now supports persistent listener mode.
+- Listener mode must subscribe to `robot/<robotId>/command` and execute robot movement from backend commands (`DELIVERY_TASK`, `RETURN_TO_DOCK`) without per-request manual trigger.
+- Keep status payload key as `state` and continue continuous pose publishing to `robot/<robotId>/pose`.
+- Ignore overlapping commands while a simulation is already running for safe demo behavior.

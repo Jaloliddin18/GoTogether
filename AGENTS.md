@@ -176,3 +176,25 @@ If Codex makes bad changes before commit, suggest:
 If a bad commit was made and not pushed, suggest:
 - `git reset --soft HEAD~1` to keep changes
 - `git reset --hard HEAD~1` only if I want to discard changes completely
+
+---
+
+## Session Update (2026-05-19) — Robot lifecycle automation + simulator command listener
+
+### Completed
+- `updateRequestStatus(COMPLETED)` lifecycle now supports automatic robot transition:
+  - emit completion update
+  - release robot
+  - assign next queued request if available
+  - otherwise set robot to `RETURNING` and publish `RETURN_TO_DOCK` command.
+- MQTT telemetry resolution was extended so post-completion movement can continue to reach the same request room for frontend tracking continuity.
+- Terminal request statuses are protected from non-terminal rollback during late telemetry.
+- Simulator script was upgraded:
+  - kept one-shot/manual mode
+  - added persistent listener mode (`--listen=true`) that subscribes to `robot/<robotId>/command`
+  - supports `DELIVERY_TASK` and `RETURN_TO_DOCK`
+  - prevents overlapping runs while robot is busy
+  - keeps `state` field in status payloads and continuous pose publishing.
+
+### Operational rule from this session
+- For realistic demos, start simulator once in listener mode and trigger movement by creating requests or completing requests; avoid manual per-request one-shot publishing.
