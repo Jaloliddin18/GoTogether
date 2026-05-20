@@ -622,7 +622,6 @@ export class RequestService {
 		const filter: T = {
 			bookId,
 			bookInventoryType: expectedType,
-			bookInventoryStatus: BookInventoryStatus.AVAILABLE,
 			deletedAt: null,
 			$expr: {
 				$gt: [
@@ -670,7 +669,11 @@ export class RequestService {
 
 		if (updated) {
 			await this.syncInventoryStatusByAvailability(updated._id);
+			return;
 		}
+
+		// Heal stale state where reserved quantity is already zero but status is still RESERVED.
+		await this.syncInventoryStatusByAvailability(sourceInventoryId);
 	}
 
 	private async applyCompletionToInventory(request: RequestTask): Promise<void> {
@@ -688,7 +691,9 @@ export class RequestService {
 				.exec();
 			if (updated) {
 				await this.syncInventoryStatusByAvailability(updated._id);
+				return;
 			}
+			await this.syncInventoryStatusByAvailability(request.sourceInventoryId);
 			return;
 		}
 
@@ -706,7 +711,9 @@ export class RequestService {
 				.exec();
 			if (updated) {
 				await this.syncInventoryStatusByAvailability(updated._id);
+				return;
 			}
+			await this.syncInventoryStatusByAvailability(request.sourceInventoryId);
 		}
 	}
 
