@@ -8,7 +8,7 @@ import { TwitFeedType } from '../../enums/twit.enum';
 @InputType()
 export class CreateTwitInput {
 	@IsNotEmpty()
-	@Length(1, 280)
+	@Length(1, 500)
 	@Field(() => String)
 	text: string;
 
