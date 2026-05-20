@@ -132,6 +132,15 @@ export class RequestService {
 				.exec();
 
 			const isBorrow = input.requestType === RequestType.BORROW;
+			const expectedDestinationType = isBorrow
+				? DeliveryDestinationType.STUDENT_DESK
+				: DeliveryDestinationType.RECEPTION;
+			if (
+				input.destinationType &&
+				input.destinationType !== expectedDestinationType
+			) {
+				throw new BadRequestException(RequestErrorCode.INVALID_DESTINATION);
+			}
 			const payload: T = {
 				bookId,
 				sourceInventoryId: reservedInventory._id,
@@ -139,9 +148,7 @@ export class RequestService {
 				memberId: memberId ?? null,
 				sessionId: input.sessionId ?? null,
 				destinationDeskId: isBorrow ? input.destinationDeskId ?? null : null,
-				destinationType: isBorrow
-					? DeliveryDestinationType.STUDENT_DESK
-					: DeliveryDestinationType.RECEPTION,
+				destinationType: input.destinationType ?? expectedDestinationType,
 				destination: isBorrow
 					? input.destination
 					: REQUEST_RECEPTION_DESTINATION,

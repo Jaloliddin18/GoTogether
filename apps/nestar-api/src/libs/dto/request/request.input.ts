@@ -61,6 +61,11 @@ export class CreateDeliveryRequestInput {
 	sourceInventoryId?: string;
 
 	@IsOptional()
+	@IsEnum(DeliveryDestinationType)
+	@Field(() => DeliveryDestinationType, { nullable: true })
+	destinationType?: DeliveryDestinationType;
+
+	@IsOptional()
 	@IsString()
 	@Field(() => String, { nullable: true })
 	destinationDeskId?: string;
