@@ -286,14 +286,16 @@ export class ChatService {
 			...audienceMatches,
 		];
 
-		const filter: Record<string, unknown> = { bookStatus: 'ACTIVE' };
-		if (wantsBorrow && !wantsPurchase) filter.isBorrowable = true;
-		if (wantsPurchase && !wantsBorrow) filter.isPurchasable = true;
-		if (categoryMatches.length > 0) filter.bookCategory = { $in: categoryMatches };
-		if (typeMatches.length > 0) filter.bookType = { $in: typeMatches };
-		if (formatMatches.length > 0) filter.bookFormat = { $in: formatMatches };
-		if (languageMatches.length > 0) filter.bookLanguage = { $in: languageMatches };
-		if (audienceMatches.length > 0) filter.bookAudience = { $in: audienceMatches };
+		const baseCatalogFilter: Record<string, unknown> = { bookStatus: 'ACTIVE' };
+		if (wantsBorrow && !wantsPurchase) baseCatalogFilter.isBorrowable = true;
+		if (wantsPurchase && !wantsBorrow) baseCatalogFilter.isPurchasable = true;
+		if (categoryMatches.length > 0) baseCatalogFilter.bookCategory = { $in: categoryMatches };
+		if (typeMatches.length > 0) baseCatalogFilter.bookType = { $in: typeMatches };
+		if (formatMatches.length > 0) baseCatalogFilter.bookFormat = { $in: formatMatches };
+		if (languageMatches.length > 0) baseCatalogFilter.bookLanguage = { $in: languageMatches };
+		if (audienceMatches.length > 0) baseCatalogFilter.bookAudience = { $in: audienceMatches };
+
+		const filter: Record<string, unknown> = { ...baseCatalogFilter };
 		if (meaningfulKeywords.length > 0) {
 			filter.$or = meaningfulKeywords.flatMap((keyword) => [
 				{ bookTitle: { $regex: escapeRegex(keyword), $options: 'i' } },
@@ -327,7 +329,7 @@ export class ChatService {
 				: matchedBooks.length > 0
 				? matchedBooks
 				: await this.bookModel
-						.find({ bookStatus: 'ACTIVE' })
+						.find(baseCatalogFilter)
 						.limit(25)
 						.select(selectedFields)
 						.lean();
@@ -336,7 +338,7 @@ export class ChatService {
 				? 'The user did not ask for book recommendations or catalog search. Do not recommend books in this answer.'
 				: matchedBooks.length > 0
 				? 'The catalog entries below were selected because they match the current user query.'
-				: 'No direct catalog match was found for the current query. The catalog entries below are general active books; say clearly when there is no exact match.';
+				: 'No direct catalog match was found for the current query. The catalog entries below are fallback active books that still follow availability and enum constraints from the user query; say clearly when there is no exact match.';
 
 		const scoredBooks: ScoredBook[] = fallbackBooks
 			.map((book: BookCandidate) => ({
@@ -396,7 +398,7 @@ export class ChatService {
 			);
 			const shouldReturnBookCards =
 				shouldUseCatalogContext &&
-				matchedBooks.length > 0 &&
+				books.length > 0 &&
 				(hasBookSuggestionIntent(currentMessage, currentEnumMatches, currentWantsBorrow, currentWantsPurchase) ||
 					Boolean(exactDetailBook));
 			const suggestions = shouldReturnBookCards
