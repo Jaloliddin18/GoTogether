@@ -1,10 +1,59 @@
 # 같이Go Backend — Session Memory
 
 ## Last Updated
-2026-05-19
+2026-05-21
 
 ## Current Branch
 develop
+
+## Session Update (2026-05-21)
+
+### Completed
+- Added Groq-powered REST chatbot backend under `apps/nestar-api/src/components/chat/`.
+- New endpoint: `POST /chat/message`.
+- Registered `ChatModule` in `ComponentsModule`.
+- Removed the old general `SocketGateway` provider from `SocketModule`; `RobotGateway` remains registered and untouched.
+- `ChatService` reads `process.env.GROQ_API_KEY` and sends Groq requests with `Authorization: Bearer <key>`.
+- Groq model: `llama-3.3-70b-versatile`.
+- Chat retrieval now uses live MongoDB `Book` data rather than static examples.
+- Retrieval is query-aware:
+  - detects borrow/purchase intent
+  - matches category, type, format, language, and audience enums
+  - searches title, author, ISBN, call number, and description
+  - scores/ranks candidate books
+  - fetches a detail-style top match for availability/detail/ISBN/call-number/price/rating questions
+- `/chat/message` returns structured response shape:
+  - `reply: string`
+  - `books: ChatBookSuggestion[]`
+- `ChatBookSuggestion` includes `bookId`, `title`, `author`, `image`, `category`, `callNumber`, `isBorrowable`, and `isPurchasable`.
+
+### Verification
+- Backend build passed with `npm run build`.
+- Frontend build also passed from the frontend repo with `yarn build`.
+
+### Key rules from this session
+- Backend build command is `npm run build`, not yarn.
+- Keep Groq access backend-only; never expose `GROQ_API_KEY` to the frontend.
+- Keep chatbot catalog answers grounded in DB retrieval context.
+- Do not use the old general socket chat for chatbot work.
+- Do not touch `apps/nestar-api/src/socket/robot.gateway.ts` for chatbot work.
+
+### Current stopping point
+- Backend chatbot module and structured book suggestion API are implemented and build cleanly.
+- Live runtime QA still needed with MongoDB, backend `.env`, valid `GROQ_API_KEY`, and frontend chatbot UI.
+
+---
+
+## Session Update (2026-05-20)
+
+### Completed
+- Raised twit text character limit from 280 to 500 across all three enforcement points:
+  - `apps/nestar-api/src/libs/dto/twit/twit.input.ts` — `@Length(1, 500)`
+  - `apps/nestar-api/src/components/twit/twit.service.ts` — service guard `text.length > 500`
+  - `apps/nestar-api/src/schemas/Twit.model.ts` — Mongoose `maxlength: 500`
+- Commit: `6b20d45`
+
+---
 
 ## Session Update (2026-05-19)
 
