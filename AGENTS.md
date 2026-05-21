@@ -51,7 +51,8 @@ Add Smart Library features incrementally while preserving existing backend behav
 - Chatbot module lives under `apps/nestar-api/src/components/chat/`.
 - Chatbot REST endpoint is `POST /chat/message`.
 - Chatbot response shape is `{ reply: string, books: ChatBookSuggestion[] }`.
-- Keep chatbot book answers grounded in live DB retrieval from the `Book` collection.
+- Keep chatbot book answers grounded in live DB retrieval from the `Book` collection only when the current user message asks for book/catalog results.
+- Do not return fallback active books as UI suggestions for unrelated chat questions.
 - Do not reintroduce the old general `SocketGateway` for chatbot work.
 - Do not touch `apps/nestar-api/src/socket/robot.gateway.ts` for chatbot work.
 

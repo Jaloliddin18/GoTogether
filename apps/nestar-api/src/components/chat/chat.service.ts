@@ -149,6 +149,23 @@ const hasDetailIntent = (text: string): boolean =>
 	text.includes('대출') ||
 	text.includes('구매');
 
+const hasBookSuggestionIntent = (
+	text: string,
+	enumMatches: string[],
+	wantsBorrow: boolean,
+	wantsPurchase: boolean,
+): boolean => {
+	const asksForBookResults =
+		/\b(author|available books|book recommendations?|books by|borrowable|call number|catalog|find|isbn|list|purchasable|recommend|search|show|title|which books)\b/i.test(
+			text,
+		);
+	const asksWhichActionBooks =
+		(wantsBorrow || wantsPurchase) && /\b(available|books|recommend|show|which)\b/i.test(text);
+	const asksInKorean = /추천|도서|책|검색|구매 가능한|대출 가능한/.test(text);
+
+	return asksForBookResults || enumMatches.length > 0 || asksWhichActionBooks || asksInKorean;
+};
+
 const scoreBook = (
 	book: BookCandidate,
 	normalizedSearch: string,
@@ -228,6 +245,7 @@ export class ChatService {
 			.slice(-4)
 			.map((item) => item.content)
 			.join(' ');
+		const currentMessage = message.trim();
 		const searchText = `${recentUserHistory} ${message}`.trim();
 		const normalizedSearch = normalizeForMatch(searchText);
 
@@ -235,12 +253,23 @@ export class ChatService {
 			/\b(borrow|borrowing|loan|checkout|lend)\b/i.test(searchText) || searchText.includes('대출');
 		const wantsPurchase =
 			/\b(buy|purchase|purchasing|payment|pay)\b/i.test(searchText) || searchText.includes('구매');
+		const currentWantsBorrow =
+			/\b(borrow|borrowing|loan|checkout|lend)\b/i.test(currentMessage) || currentMessage.includes('대출');
+		const currentWantsPurchase =
+			/\b(buy|purchase|purchasing|payment|pay)\b/i.test(currentMessage) || currentMessage.includes('구매');
 
 		const categoryMatches = extractEnumMatches(searchText, Object.values(BookCategory));
 		const typeMatches = extractEnumMatches(searchText, Object.values(BookType));
 		const formatMatches = extractEnumMatches(searchText, Object.values(BookFormat));
 		const languageMatches = extractEnumMatches(searchText, Object.values(BookLanguage));
 		const audienceMatches = extractEnumMatches(searchText, Object.values(BookAudience));
+		const currentEnumMatches = [
+			...extractEnumMatches(currentMessage, Object.values(BookCategory)),
+			...extractEnumMatches(currentMessage, Object.values(BookType)),
+			...extractEnumMatches(currentMessage, Object.values(BookFormat)),
+			...extractEnumMatches(currentMessage, Object.values(BookLanguage)),
+			...extractEnumMatches(currentMessage, Object.values(BookAudience)),
+		];
 		const keywords = extractKeywords(searchText);
 		const meaningfulKeywords = extractMeaningfulKeywords(keywords, [
 			...categoryMatches,
@@ -249,6 +278,13 @@ export class ChatService {
 			...languageMatches,
 			...audienceMatches,
 		]);
+		const enumMatches = [
+			...categoryMatches,
+			...typeMatches,
+			...formatMatches,
+			...languageMatches,
+			...audienceMatches,
+		];
 
 		const filter: Record<string, unknown> = { bookStatus: 'ACTIVE' };
 		if (wantsBorrow && !wantsPurchase) filter.isBorrowable = true;
@@ -271,14 +307,24 @@ export class ChatService {
 		const selectedFields =
 			'bookTitle bookAuthor bookIsbn bookCallNumber bookImages bookCategory bookType bookFormat bookLanguage bookAudience bookPublishedYear bookPages bookDescription bookPrice bookRating isBorrowable isPurchasable';
 
-		const matchedBooks = await this.bookModel
-			.find(filter)
-			.limit(40)
-			.select(selectedFields)
-			.lean();
+		const shouldUseCatalogContext = hasBookSuggestionIntent(
+			currentMessage,
+			currentEnumMatches,
+			currentWantsBorrow,
+			currentWantsPurchase,
+		);
+		const matchedBooks = shouldUseCatalogContext
+			? await this.bookModel
+					.find(filter)
+					.limit(40)
+					.select(selectedFields)
+					.lean()
+			: [];
 
 		const fallbackBooks =
-			matchedBooks.length > 0
+			!shouldUseCatalogContext
+				? []
+				: matchedBooks.length > 0
 				? matchedBooks
 				: await this.bookModel
 						.find({ bookStatus: 'ACTIVE' })
@@ -286,7 +332,9 @@ export class ChatService {
 						.select(selectedFields)
 						.lean();
 		const retrievalNote =
-			matchedBooks.length > 0
+			!shouldUseCatalogContext
+				? 'The user did not ask for book recommendations or catalog search. Do not recommend books in this answer.'
+				: matchedBooks.length > 0
 				? 'The catalog entries below were selected because they match the current user query.'
 				: 'No direct catalog match was found for the current query. The catalog entries below are general active books; say clearly when there is no exact match.';
 
@@ -308,9 +356,9 @@ export class ChatService {
 						.lean()
 				: null;
 
-		const bookContext = books
-			.map((b: BookCandidate) => formatBookLine(b))
-			.join('\n');
+		const bookContext = books.length > 0
+			? books.map((b: BookCandidate) => formatBookLine(b)).join('\n')
+			: 'No catalog context was requested for this message.';
 		const toolContext = exactDetailBook
 			? `\n\nTool result - getBookDetail:\n${formatBookLine(exactDetailBook as BookCandidate)}\nUse this detail result as the primary source for this answer.`
 			: '';
@@ -346,10 +394,17 @@ export class ChatService {
 					},
 				),
 			);
-			const suggestions = books
-				.map((book) => toBookSuggestion(book))
-				.filter((book): book is ChatBookSuggestion => Boolean(book))
-				.slice(0, 3);
+			const shouldReturnBookCards =
+				shouldUseCatalogContext &&
+				matchedBooks.length > 0 &&
+				(hasBookSuggestionIntent(currentMessage, currentEnumMatches, currentWantsBorrow, currentWantsPurchase) ||
+					Boolean(exactDetailBook));
+			const suggestions = shouldReturnBookCards
+				? books
+						.map((book) => toBookSuggestion(book))
+						.filter((book): book is ChatBookSuggestion => Boolean(book))
+						.slice(0, 3)
+				: [];
 
 			return {
 				reply: response.data.choices[0].message.content as string,

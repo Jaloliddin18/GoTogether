@@ -26,6 +26,8 @@ develop
   - `reply: string`
   - `books: ChatBookSuggestion[]`
 - `ChatBookSuggestion` includes `bookId`, `title`, `author`, `image`, `category`, `callNumber`, `isBorrowable`, and `isPurchasable`.
+- Book suggestions are returned only when the current user message asks for books/catalog results.
+- General assistant answers do not inject catalog context and should not recommend books.
 
 ### Verification
 - Backend build passed with `npm run build`.
@@ -34,7 +36,8 @@ develop
 ### Key rules from this session
 - Backend build command is `npm run build`, not yarn.
 - Keep Groq access backend-only; never expose `GROQ_API_KEY` to the frontend.
-- Keep chatbot catalog answers grounded in DB retrieval context.
+- Keep chatbot catalog answers grounded in DB retrieval context only when the user asks for book/catalog results.
+- Do not return fallback active books as UI suggestions for unrelated questions.
 - Do not use the old general socket chat for chatbot work.
 - Do not touch `apps/nestar-api/src/socket/robot.gateway.ts` for chatbot work.
 
