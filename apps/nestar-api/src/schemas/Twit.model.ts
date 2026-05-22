@@ -12,7 +12,7 @@ const TwitSchema = new Schema(
 		text: {
 			type: String,
 			required: true,
-			maxlength: 280,
+			maxlength: 500,
 		},
 
 		images: {

@@ -67,7 +67,7 @@ export class TwitService {
 		input: CreateTwitInput,
 	): Promise<Twit> {
 		const text = input.text?.trim();
-		if (!text || text.length > 280)
+		if (!text || text.length > 500)
 			throw new BadRequestException(Message.BAD_REQUEST);
 
 		try {

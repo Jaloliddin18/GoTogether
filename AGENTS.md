@@ -46,6 +46,15 @@ Add Smart Library features incrementally while preserving existing backend behav
 - Do not mix robot tracking with the existing general socket gateway.
 - Do not add ROS, YOLO, OCR, or motor-control code inside NestJS backend.
 - Backend communicates with robot through MQTT only; ROS 2 remains robot-side.
+- Backend build command is `npm run build`.
+- Keep Groq API access backend-only; do not expose `GROQ_API_KEY` to frontend code.
+- Chatbot module lives under `apps/nestar-api/src/components/chat/`.
+- Chatbot REST endpoint is `POST /chat/message`.
+- Chatbot response shape is `{ reply: string, books: ChatBookSuggestion[] }`.
+- Keep chatbot book answers grounded in live DB retrieval from the `Book` collection only when the current user message asks for book/catalog results.
+- Do not return fallback active books as UI suggestions for unrelated chat questions.
+- Do not reintroduce the old general `SocketGateway` for chatbot work.
+- Do not touch `apps/nestar-api/src/socket/robot.gateway.ts` for chatbot work.
 
 ## Suggested Smart Library Locations
 - `apps/nestar-api/src/components/book/`

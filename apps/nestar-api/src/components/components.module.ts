@@ -11,6 +11,7 @@ import { RobotModule } from './robot/robot.module';
 import { RequestModule } from './request/request.module';
 import { TwitModule } from './twit/twit.module';
 import { TwitCommentModule } from './twit-comment/twit-comment.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
 	imports: [
@@ -26,6 +27,7 @@ import { TwitCommentModule } from './twit-comment/twit-comment.module';
 		RequestModule,
 		TwitModule,
 		TwitCommentModule,
+		ChatModule,
 	],
 })
 export class ComponentsModule {}
