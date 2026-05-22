@@ -132,6 +132,15 @@ export class RequestService {
 				.exec();
 
 			const isBorrow = input.requestType === RequestType.BORROW;
+			const expectedDestinationType = isBorrow
+				? DeliveryDestinationType.STUDENT_DESK
+				: DeliveryDestinationType.RECEPTION;
+			if (
+				input.destinationType &&
+				input.destinationType !== expectedDestinationType
+			) {
+				throw new BadRequestException(RequestErrorCode.INVALID_DESTINATION);
+			}
 			const payload: T = {
 				bookId,
 				sourceInventoryId: reservedInventory._id,
@@ -139,9 +148,7 @@ export class RequestService {
 				memberId: memberId ?? null,
 				sessionId: input.sessionId ?? null,
 				destinationDeskId: isBorrow ? input.destinationDeskId ?? null : null,
-				destinationType: isBorrow
-					? DeliveryDestinationType.STUDENT_DESK
-					: DeliveryDestinationType.RECEPTION,
+				destinationType: input.destinationType ?? expectedDestinationType,
 				destination: isBorrow
 					? input.destination
 					: REQUEST_RECEPTION_DESTINATION,
@@ -615,7 +622,6 @@ export class RequestService {
 		const filter: T = {
 			bookId,
 			bookInventoryType: expectedType,
-			bookInventoryStatus: BookInventoryStatus.AVAILABLE,
 			deletedAt: null,
 			$expr: {
 				$gt: [
@@ -663,7 +669,11 @@ export class RequestService {
 
 		if (updated) {
 			await this.syncInventoryStatusByAvailability(updated._id);
+			return;
 		}
+
+		// Heal stale state where reserved quantity is already zero but status is still RESERVED.
+		await this.syncInventoryStatusByAvailability(sourceInventoryId);
 	}
 
 	private async applyCompletionToInventory(request: RequestTask): Promise<void> {
@@ -681,7 +691,9 @@ export class RequestService {
 				.exec();
 			if (updated) {
 				await this.syncInventoryStatusByAvailability(updated._id);
+				return;
 			}
+			await this.syncInventoryStatusByAvailability(request.sourceInventoryId);
 			return;
 		}
 
@@ -699,7 +711,9 @@ export class RequestService {
 				.exec();
 			if (updated) {
 				await this.syncInventoryStatusByAvailability(updated._id);
+				return;
 			}
+			await this.syncInventoryStatusByAvailability(request.sourceInventoryId);
 		}
 	}
 
