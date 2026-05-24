@@ -207,3 +207,17 @@ If a bad commit was made and not pushed, suggest:
 
 ### Operational rule from this session
 - For realistic demos, start simulator once in listener mode and trigger movement by creating requests or completing requests; avoid manual per-request one-shot publishing.
+
+---
+
+## Session Update (2026-05-24) — Admin bookLikes sort validation
+
+### Completed
+- Added `bookLikes` to `availableBookSorts` in `apps/nestar-api/src/libs/config.ts`.
+- This allows admin `GET_ALL_BOOKS_BY_ADMIN` queries to sort by `bookLikes`, required by the frontend admin dashboard `Top Liked Books` ranked list.
+
+### Verification
+- `npm run build` passed after the validation change.
+
+### Key rule
+- When frontend admin dashboards add ranked book widgets, ensure the requested sort field is included in backend `availableBookSorts`; otherwise GraphQL validation returns `Bad Request Exception` before the service runs.

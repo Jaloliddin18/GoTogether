@@ -17,6 +17,7 @@ export const availableBookSorts = [
 	'bookTitle',
 	'bookRank',
 	'bookViews',
+	'bookLikes',
 	'bookPrice.amount',
 	'bookRating.average',
 	'bookPublishedYear',

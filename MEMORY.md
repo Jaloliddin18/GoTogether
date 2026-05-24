@@ -1,10 +1,24 @@
 # 같이Go Backend — Session Memory
 
 ## Last Updated
-2026-05-21
+2026-05-24
 
 ## Current Branch
 develop
+
+## Session Update (2026-05-24)
+
+### Completed
+- Added `bookLikes` to `availableBookSorts` in `apps/nestar-api/src/libs/config.ts`.
+- Admin `GET_ALL_BOOKS_BY_ADMIN` now accepts `sort: "bookLikes"`, which the frontend admin dashboard uses for the Top Liked Books ranked list.
+
+### Verification
+- Backend build passed with `npm run build`.
+
+### Current stopping point
+- Restart the backend server so the new validation config is loaded at runtime.
+
+---
 
 ## Session Update (2026-05-21)
 
