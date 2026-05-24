@@ -170,8 +170,19 @@ export const lookupAuthMemberFollowed = (input: LookupAuthMemberFollowed) => {
 export const lookupMember = {
 	$lookup: {
 		from: 'members',
-		localField: 'memberId',
-		foreignField: '_id',
+		let: { localMemberId: '$memberId' },
+		pipeline: [
+			{
+				$match: {
+					$expr: { $eq: ['$_id', '$$localMemberId'] },
+				},
+			},
+			{
+				$addFields: {
+					memberBooks: { $ifNull: ['$memberBooks', 0] },
+				},
+			},
+		],
 		as: 'memberData',
 	},
 };
@@ -179,8 +190,19 @@ export const lookupMember = {
 export const lookupFollowingData = {
 	$lookup: {
 		from: 'members',
-		localField: 'followingId',
-		foreignField: '_id',
+		let: { localFollowingId: '$followingId' },
+		pipeline: [
+			{
+				$match: {
+					$expr: { $eq: ['$_id', '$$localFollowingId'] },
+				},
+			},
+			{
+				$addFields: {
+					memberBooks: { $ifNull: ['$memberBooks', 0] },
+				},
+			},
+		],
 		as: 'followingData',
 	},
 };
@@ -188,8 +210,19 @@ export const lookupFollowingData = {
 export const lookupFollowerData = {
 	$lookup: {
 		from: 'members',
-		localField: 'followerId',
-		foreignField: '_id',
+		let: { localFollowerId: '$followerId' },
+		pipeline: [
+			{
+				$match: {
+					$expr: { $eq: ['$_id', '$$localFollowerId'] },
+				},
+			},
+			{
+				$addFields: {
+					memberBooks: { $ifNull: ['$memberBooks', 0] },
+				},
+			},
+		],
 		as: 'followerData',
 	},
 };

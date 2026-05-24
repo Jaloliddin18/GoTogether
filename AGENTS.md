@@ -188,6 +188,41 @@ If a bad commit was made and not pushed, suggest:
 
 ---
 
+## Session Update (2026-05-24) — memberBooks admin-only persistence policy
+
+### Completed
+- Enforced `memberBooks` as an admin-only stored DB field:
+  - `apps/nestar-api/src/schemas/Member.model.ts`
+  - removed unconditional `memberBooks` default
+  - added schema pre-save guard: keep numeric `memberBooks` for `ADMIN`, unset for non-admin.
+- Added service-level enforcement and response normalization:
+  - `apps/nestar-api/src/components/member/member.service.ts`
+  - on member updates, non-admin docs now `$unset` `memberBooks`; admin docs ensure numeric `memberBooks`.
+  - API responses normalize missing `memberBooks` to `0` to keep existing GraphQL consumers safe.
+- Hardened member lookups used by twit/follow/comment aggregations:
+  - `apps/nestar-api/src/libs/config.ts`
+  - `lookupMember`, `lookupFollowingData`, `lookupFollowerData` now include `$addFields.memberBooks: { $ifNull: [...] }`.
+- Updated backfill script for policy migration:
+  - `apps/nestar-api/src/scripts/backfill-member-counters.ts`
+  - general counters backfill keeps existing behavior
+  - `memberBooks` now normalized only for admins and removed from non-admin docs.
+- Updated startup health check policy:
+  - `apps/nestar-api/src/components/member/member-health-check.service.ts`
+  - validates `memberBooks` is numeric for admins and missing for non-admins.
+
+### Verification
+- `npm run build` passed.
+- `npm run backfill:member-counters` executed with:
+  - `member counter backfill done (general counters): matched=9, modified=0`
+  - `memberBooks admin-only normalize done: matched=2, modified=0`
+  - `memberBooks removed for non-admins: matched=7, modified=7`
+
+### Operational rule from this session
+- `memberBooks` should be treated as an admin-only persisted DB field.
+- For user-facing/non-admin member documents, `memberBooks` must not be stored in Mongo.
+
+---
+
 ## Session Update (2026-05-19) — Robot lifecycle automation + simulator command listener
 
 ### Completed

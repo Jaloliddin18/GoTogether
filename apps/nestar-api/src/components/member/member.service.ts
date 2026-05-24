@@ -11,7 +11,7 @@ import {
 	MemberInput,
 	MembersInquiry,
 } from '../../libs/dto/member/member.input';
-import { MemberStatus } from '../../libs/enums/member.enum';
+import { MemberStatus, MemberType } from '../../libs/enums/member.enum';
 import { Direction, Message } from '../../libs/enums/common.enum';
 import { AuthService } from '../auth/auth.service';
 import { MemberUpdate } from '../../libs/dto/member/member.update';
@@ -34,6 +34,35 @@ export class MemberService {
 		private readonly likeService: LikeService,
 	) {}
 
+	private normalizeMemberBooksForResponse(member: T): Member {
+		member.memberBooks =
+			typeof member.memberBooks === 'number' &&
+			Number.isFinite(member.memberBooks)
+				? member.memberBooks
+				: 0;
+		return member as Member;
+	}
+
+	private async syncMemberBooksField(member: Member): Promise<void> {
+		if (member.memberType === MemberType.ADMIN) {
+			if (
+				typeof member.memberBooks !== 'number' ||
+				Number.isNaN(member.memberBooks)
+			) {
+				await this.memberModel
+					.updateOne({ _id: member._id }, { $set: { memberBooks: 0 } })
+					.exec();
+				member.memberBooks = 0;
+			}
+			return;
+		}
+
+		await this.memberModel
+			.updateOne({ _id: member._id }, { $unset: { memberBooks: '' } })
+			.exec();
+		member.memberBooks = 0;
+	}
+
 	public async signup(input: MemberInput): Promise<Member> {
 		input.memberPassword = await this.authService.hashPasword(
 			input.memberPassword,
@@ -43,7 +72,7 @@ export class MemberService {
 
 			result.accessToken = await this.authService.createToken(result);
 
-			return result;
+			return this.normalizeMemberBooksForResponse(result as unknown as T);
 		} catch (err) {
 			console.log('Error, Service.model:', err.message);
 			throw new BadRequestException(Message.USED_MEMBER_NICK_OR_PHONE);
@@ -70,7 +99,7 @@ export class MemberService {
 			throw new InternalServerErrorException(Message.WRONG_PASSWORD);
 
 		response.accessToken = await this.authService.createToken(response);
-		return response;
+		return this.normalizeMemberBooksForResponse(response as unknown as T);
 	}
 	public async updateMember(
 		memberId: ObjectId,
@@ -87,9 +116,10 @@ export class MemberService {
 			)
 			.exec();
 		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
+		await this.syncMemberBooksField(result);
 		result.accessToken = await this.authService.createToken(result);
 		// Member is returned and new regenerated accessToken is also returned
-		return result;
+		return this.normalizeMemberBooksForResponse(result as unknown as T);
 	}
 	public async getMember(
 		memberId: ObjectId,
@@ -106,6 +136,7 @@ export class MemberService {
 		// lean() return JavaScript object
 		if (!targetMember)
 			throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+		this.normalizeMemberBooksForResponse(targetMember);
 		if (memberId) {
 			const viewInput = {
 				memberId: memberId,
@@ -185,7 +216,7 @@ export class MemberService {
 		});
 		if (!result)
 			throw new InternalServerErrorException(Message.SOMETHING_WENT_WRONG);
-		return result;
+		return this.normalizeMemberBooksForResponse(result as unknown as T);
 	}
 
 	public async getAllMembersByAdmin(input: MembersInquiry): Promise<Members> {
@@ -221,6 +252,9 @@ export class MemberService {
 
 		if (!result.length)
 			throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+		result[0].list = (result[0].list ?? []).map((member: T) =>
+			this.normalizeMemberBooksForResponse(member),
+		);
 		return result[0];
 	}
 	public async updateMemberByAdmin(input: MemberUpdate): Promise<Member> {
@@ -228,7 +262,8 @@ export class MemberService {
 			.findOneAndUpdate({ _id: input._id }, input, { new: true })
 			.exec();
 		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
-		return result;
+		await this.syncMemberBooksField(result);
+		return this.normalizeMemberBooksForResponse(result as unknown as T);
 	}
 
 	public async memberStatsEditor(input: StatisticModifier): Promise<Member> {

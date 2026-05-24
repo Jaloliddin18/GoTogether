@@ -52,7 +52,6 @@ const MemberSchema = new Schema(
 		},
 		memberBooks: {
 			type: Number,
-			default: 0,
 		},
 		memberTwits: {
 			type: Number,
@@ -100,5 +99,20 @@ const MemberSchema = new Schema(
 	},
 	{ timestamps: true, collection: 'members' },
 );
+
+MemberSchema.pre('save', function (next) {
+	const isAdmin = this.get('memberType') === MemberType.ADMIN;
+	const memberBooks = this.get('memberBooks');
+
+	if (isAdmin) {
+		if (typeof memberBooks !== 'number' || Number.isNaN(memberBooks)) {
+			this.set('memberBooks', 0);
+		}
+	} else {
+		this.set('memberBooks', undefined);
+	}
+
+	next();
+});
 
 export default MemberSchema;

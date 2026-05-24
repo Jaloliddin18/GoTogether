@@ -6,6 +6,45 @@
 ## Current Branch
 develop
 
+## Session Update (2026-05-24, memberBooks admin-only policy)
+
+### Completed
+- Enforced `memberBooks` as admin-only at backend persistence level.
+- `apps/nestar-api/src/schemas/Member.model.ts`:
+  - removed unconditional `memberBooks` default
+  - added pre-save policy:
+    - `ADMIN` => ensure numeric `memberBooks` (fallback `0`)
+    - non-admin => unset `memberBooks`.
+- `apps/nestar-api/src/components/member/member.service.ts`:
+  - added post-update enforcement for `memberBooks` by `memberType`
+  - non-admin member updates now unset `memberBooks` from DB
+  - admin updates ensure `memberBooks` exists as numeric
+  - response payloads normalize `memberBooks` to `0` when missing to preserve GraphQL compatibility.
+- `apps/nestar-api/src/libs/config.ts`:
+  - upgraded `lookupMember`, `lookupFollowingData`, `lookupFollowerData` to lookup pipelines with `$addFields.memberBooks: { $ifNull: ['$memberBooks', 0] }`
+  - protects nested `memberData` reads in twit/follow/comment aggregation flows.
+- `apps/nestar-api/src/scripts/backfill-member-counters.ts`:
+  - keeps general counters backfill behavior
+  - normalizes `memberBooks` only for admins
+  - removes `memberBooks` from all non-admin docs.
+- `apps/nestar-api/src/components/member/member-health-check.service.ts`:
+  - added policy health check:
+    - admins must have numeric `memberBooks`
+    - non-admins must have missing `memberBooks`.
+
+### Verification
+- Backend build passed with `npm run build`.
+- `npm run backfill:member-counters` executed successfully:
+  - `member counter backfill done (general counters): matched=9, modified=0`
+  - `memberBooks admin-only normalize done: matched=2, modified=0`
+  - `memberBooks removed for non-admins: matched=7, modified=7`.
+
+### Current stopping point
+- Existing DB rows were migrated once using the updated backfill script.
+- Backend now enforces admin-only `memberBooks` for new and updated member documents.
+
+---
+
 ## Session Update (2026-05-24)
 
 ### Completed

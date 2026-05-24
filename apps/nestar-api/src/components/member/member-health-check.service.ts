@@ -2,9 +2,9 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Member } from '../../libs/dto/member/member';
+import { MemberType } from '../../libs/enums/member.enum';
 
 const counterFields = [
-	'memberBooks',
 	'memberTwits',
 	'memberFollowers',
 	'memberFollowings',
@@ -54,27 +54,101 @@ export class MemberHealthCheckService implements OnModuleInit {
 				.exec();
 			const malformedCount = malformedCountRows[0]?.total ?? 0;
 
-			if (!malformedCount) {
+			const memberBooksPolicyCountRows = await this.memberModel
+				.aggregate([
+					{
+						$project: {
+							memberNick: 1,
+							memberType: 1,
+							memberBooksType: { $type: '$memberBooks' },
+						},
+					},
+					{
+						$match: {
+							$or: [
+								{
+									$and: [
+										{ memberType: MemberType.ADMIN },
+										{ memberBooksType: { $nin: numericMongoTypes } },
+									],
+								},
+								{
+									$and: [
+										{ memberType: { $ne: MemberType.ADMIN } },
+										{ memberBooksType: { $ne: 'missing' } },
+									],
+								},
+							],
+						},
+					},
+					{ $count: 'total' },
+				])
+				.exec();
+			const memberBooksPolicyCount = memberBooksPolicyCountRows[0]?.total ?? 0;
+
+			if (!malformedCount && !memberBooksPolicyCount) {
 				this.logger.log(
-					`Member counter startup health check passed. fields=${counterFields.join(', ')}`,
+					`Member counter startup health check passed. fields=${counterFields.join(', ')}, memberBooksPolicy=admin-only`,
 				);
 				return;
 			}
 
-			const samples = await this.memberModel
-				.aggregate([
-					...pipeline,
-					{ $project: { _id: 1, memberNick: 1, invalidFields: 1 } },
-					{ $limit: 10 },
-				])
-				.exec();
+			if (malformedCount) {
+				const malformedSamples = await this.memberModel
+					.aggregate([
+						...pipeline,
+						{ $project: { _id: 1, memberNick: 1, invalidFields: 1 } },
+						{ $limit: 10 },
+					])
+					.exec();
+				this.logger.warn(
+					`Member counter startup health check found malformed docs: count=${malformedCount}, sampleLimit=10`,
+				);
+				this.logger.warn(
+					`Malformed member samples: ${JSON.stringify(malformedSamples)}`,
+				);
+			}
 
-			this.logger.warn(
-				`Member counter startup health check found malformed docs: count=${malformedCount}, sampleLimit=10`,
-			);
-			this.logger.warn(
-				`Malformed member samples: ${JSON.stringify(samples)}`,
-			);
+			if (memberBooksPolicyCount) {
+				const memberBooksPolicySamples = await this.memberModel
+					.aggregate([
+						{
+							$project: {
+								_id: 1,
+								memberNick: 1,
+								memberType: 1,
+								memberBooks: 1,
+								memberBooksType: { $type: '$memberBooks' },
+							},
+						},
+						{
+							$match: {
+								$or: [
+									{
+										$and: [
+											{ memberType: MemberType.ADMIN },
+											{ memberBooksType: { $nin: numericMongoTypes } },
+										],
+									},
+									{
+										$and: [
+											{ memberType: { $ne: MemberType.ADMIN } },
+											{ memberBooksType: { $ne: 'missing' } },
+										],
+									},
+								],
+							},
+						},
+						{ $limit: 10 },
+					])
+					.exec();
+				this.logger.warn(
+					`MemberBooks policy check failed: count=${memberBooksPolicyCount}, policy=admin-only, sampleLimit=10`,
+				);
+				this.logger.warn(
+					`MemberBooks policy violation samples: ${JSON.stringify(memberBooksPolicySamples)}`,
+				);
+			}
 		} catch (error) {
 			const msg = error instanceof Error ? error.message : String(error);
 			this.logger.error(`Member counter startup health check failed: ${msg}`);

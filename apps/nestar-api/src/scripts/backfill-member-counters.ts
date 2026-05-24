@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import mongoose from 'mongoose';
+import { MemberType } from '../libs/enums/member.enum';
 
 const counterFields = [
-	'memberBooks',
 	'memberTwits',
 	'memberFollowers',
 	'memberFollowings',
@@ -45,7 +45,35 @@ async function main(): Promise<void> {
 
 	const result = await members.updateMany({}, [{ $set: updateSet }]);
 	console.log(
-		`member counter backfill done: matched=${result.matchedCount}, modified=${result.modifiedCount}`,
+		`member counter backfill done (general counters): matched=${result.matchedCount}, modified=${result.modifiedCount}`,
+	);
+
+	const adminMemberBooksResult = await members.updateMany(
+		{ memberType: MemberType.ADMIN },
+		[
+			{
+				$set: {
+					memberBooks: {
+						$cond: [
+							{ $in: [{ $type: '$memberBooks' }, numericMongoTypes] },
+							'$memberBooks',
+							0,
+						],
+					},
+				},
+			},
+		],
+	);
+	console.log(
+		`memberBooks admin-only normalize done: matched=${adminMemberBooksResult.matchedCount}, modified=${adminMemberBooksResult.modifiedCount}`,
+	);
+
+	const unsetNonAdminMemberBooksResult = await members.updateMany(
+		{ memberType: { $ne: MemberType.ADMIN } },
+		{ $unset: { memberBooks: '' } },
+	);
+	console.log(
+		`memberBooks removed for non-admins: matched=${unsetNonAdminMemberBooksResult.matchedCount}, modified=${unsetNonAdminMemberBooksResult.modifiedCount}`,
 	);
 
 	await mongoose.disconnect();
