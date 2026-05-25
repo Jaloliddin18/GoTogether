@@ -133,3 +133,16 @@ Phase 1 guardrails:
 - Do not modify MQTT runtime service in Phase 1.
 - Do not modify upload behavior in Phase 1.
 - Always run `npm run build` after Phase 1 backend changes.
+
+---
+
+## Session Note (2026-05-26) — LostItem Phase 2 workflow boundary
+
+For LostItem Phase 2 backend work:
+- Extend MQTT handling only for patrol lost-item ingestion (`robot/{robotId}/lost-item`).
+- Preserve existing status/pose MQTT runtime behavior as-is.
+- Save valid patrol events to `lostItems` collection only.
+- Drop malformed payloads with warnings; never crash backend telemetry pipeline.
+- Do not add image upload API in Phase 2.
+- Do not add frontend changes in Phase 2.
+- Run `npm run build` after MQTT/LostItem integration edits.

@@ -174,8 +174,33 @@
 - Added admin GraphQL mutation:
   - `updateLostItemStatus(input: UpdateLostItemStatusInput!): LostItem`
 
+### 3.8 LostItem Phase 2 MQTT ingestion (2026-05-26)
+- Extended MQTT subscription scope for patrol detection events:
+  - subscribed wildcard topic: `robot/+/lost-item`
+  - preserves existing per-robot status/pose topic subscription behavior.
+- Extended MQTT topic parser in `apps/nestar-api/src/robot-comm/mqtt.service.ts`:
+  - supports `status`, `pose`, and `lost-item` topic types.
+- Added lost-item event ingestion flow:
+  - safe JSON parsing and payload shape validation
+  - `eventType` validation (`LOST_ITEM_DETECTED` only)
+  - `robotId` normalization (topic robotId priority on mismatch)
+  - `objectType` normalization to LostItem enum
+  - `priority` normalization with fallback by object type
+  - `status` normalization with default `PENDING_REVIEW`
+  - `confidence` validation in range `[0,1]` (invalid payloads dropped)
+  - `detectedAt` fallback to current date when missing/invalid
+  - optional `snapshotPath` / `snapshotUrl` accepted.
+- Added internal create method for persistence:
+  - `LostItemService.createLostItemFromPatrolEvent(...)`
+- Wired LostItem service into MQTT module:
+  - `apps/nestar-api/src/robot-comm/mqtt.module.ts` imports `LostItemModule`.
+- Current Phase 2 behavior:
+  - valid lost-item events are persisted to MongoDB `lostItems`
+  - malformed payloads are warned/dropped without crashing backend
+  - no lost-item WebSocket emit yet.
+
 ## 4. Build verification
-- `npm run build` passes after Phase 4/5/6 implementation, follow-up fixes, and LostItem Phase 1.
+- `npm run build` passes after Phase 4/5/6 implementation, follow-up fixes, LostItem Phase 1, and LostItem Phase 2.
 
 ## 5. Completed runtime tests (confirmed)
 - Local MQTT broker connection works.
@@ -221,13 +246,11 @@
 ## 7. Next project steps
 1. Finish remaining runtime tests:
 - WebSocket client `joinRequest` + event reception
-2. Move to LostItem Phase 2:
-- add MQTT topic listener for `robot/{robotId}/lost-item` and persist events to `lostItems`.
-3. Move to LostItem Phase 3:
+2. Move to LostItem Phase 3:
 - add snapshot upload API path for robot/vision module.
-4. Move to Phase 7:
+3. Move to Phase 7:
 - staff/admin dashboard operations (include lost-item morning review list/actions).
-5. Later:
+4. Later:
 - richer demo data
 - frontend book list/detail
 - borrow/purchase buttons

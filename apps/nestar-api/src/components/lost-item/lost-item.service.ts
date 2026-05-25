@@ -8,7 +8,35 @@ import {
 import { LostItemsInquiry } from '../../libs/dto/lost-item/lost-item.input';
 import { UpdateLostItemStatusInput } from '../../libs/dto/lost-item/lost-item.update';
 import { Direction, Message } from '../../libs/enums/common.enum';
+import {
+	LostItemEventType,
+	LostItemObjectType,
+	LostItemPriority,
+	LostItemStatus,
+} from '../../libs/enums/lost-item.enum';
 import { T } from '../../libs/types/common';
+
+export interface LostItemLocationInput {
+	source?: string;
+	floorId?: string;
+	x?: number | null;
+	y?: number | null;
+	patrolCheckpoint?: string;
+}
+
+export interface CreateLostItemFromPatrolEventInput {
+	robotId: string;
+	eventType: LostItemEventType;
+	objectType: LostItemObjectType;
+	confidence: number;
+	priority: LostItemPriority;
+	detectedAt: Date;
+	snapshotPath?: string;
+	snapshotUrl?: string;
+	location?: LostItemLocationInput;
+	status: LostItemStatus;
+	notes?: string;
+}
 
 @Injectable()
 export class LostItemService {
@@ -16,6 +44,14 @@ export class LostItemService {
 		@InjectModel('LostItem')
 		private readonly lostItemModel: Model<LostItem>,
 	) {}
+
+	public async createLostItemFromPatrolEvent(
+		input: CreateLostItemFromPatrolEventInput,
+	): Promise<LostItem> {
+		const result = await this.lostItemModel.create(input);
+		if (!result) throw new InternalServerErrorException(Message.CREATE_FAILED);
+		return result;
+	}
 
 	public async getLostItems(input: LostItemsInquiry): Promise<LostItems> {
 		const match: T = {};

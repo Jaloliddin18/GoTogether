@@ -82,6 +82,7 @@ robot/{robotId}/cancel    ← backend PUBLISHES cancel commands TO robot
 robot/{robotId}/status    ← robot PUBLISHES state updates BACK to backend
 robot/{robotId}/pose      ← robot PUBLISHES position BACK to backend
 robot/{robotId}/event     ← robot PUBLISHES events BACK to backend
+robot/{robotId}/lost-item ← vision module PUBLISHES patrol lost-item events BACK to backend
 ```
 
 ### MQTT Payload Shapes
@@ -241,3 +242,31 @@ JWT_SECRET=
 
 ### Verification
 - `npm run build` passed after implementation.
+
+---
+
+## Session Update (2026-05-26) — LostItem Phase 2 MQTT persistence
+
+### Completed
+- Extended MQTT service to subscribe lost-item patrol topic:
+  - runtime subscription: `robot/+/lost-item`
+- Extended MQTT topic parsing to support `lost-item` in addition to existing `status`/`pose`.
+- Added LostItem persistence flow from MQTT:
+  - validates `eventType` (`LOST_ITEM_DETECTED`)
+  - validates confidence range (`0..1`)
+  - normalizes object type (`id_card` -> `ID_CARD`, etc.)
+  - normalizes/defaults priority and status
+  - prefers topic robotId on mismatch
+  - tolerates missing snapshot URL/path in this phase
+  - warns and drops malformed payloads safely.
+- Added internal service creation method:
+  - `LostItemService.createLostItemFromPatrolEvent(...)`
+- Wired `MqttRobotModule` to import `LostItemModule`.
+
+### Explicitly deferred
+- No image upload endpoint yet (Phase 3).
+- No lost-item WebSocket push event yet.
+- No frontend or Python module edits.
+
+### Verification
+- `npm run build` passed after Phase 2 integration.

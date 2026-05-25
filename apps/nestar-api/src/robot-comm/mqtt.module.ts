@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { LostItemModule } from '../components/lost-item/lost-item.module';
 import BookInventorySchema from '../schemas/BookInventory.model';
 import RequestSchema from '../schemas/Request.model';
 import RobotSchema from '../schemas/Robot.model';
@@ -15,6 +16,7 @@ import { MqttRobotService } from './mqtt.service';
 			{ name: 'BookInventory', schema: BookInventorySchema },
 		]),
 		SocketModule,
+		LostItemModule,
 	],
 	providers: [MqttRobotService],
 	exports: [MqttRobotService],

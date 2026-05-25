@@ -1,10 +1,43 @@
 # 같이Go Backend — Session Memory
 
 ## Last Updated
-2026-05-25
+2026-05-26
 
 ## Current Branch
 develop
+
+## Session Update (2026-05-26, LostItem Phase 2 MQTT ingestion)
+
+### Completed
+- Extended MQTT runtime subscription for patrol lost-item topic:
+  - `robot/+/lost-item`
+- Extended MQTT topic parsing to support:
+  - `robot/{robotId}/status`
+  - `robot/{robotId}/pose`
+  - `robot/{robotId}/lost-item`
+- Added safe patrol-event normalization and validation in `apps/nestar-api/src/robot-comm/mqtt.service.ts`:
+  - `eventType` must be `LOST_ITEM_DETECTED`
+  - `confidence` must be number in `[0,1]` (invalid => drop)
+  - `objectType` normalization (`id_card`/`ID_CARD` etc.) with UNKNOWN fallback
+  - `priority` normalization with object-type-based fallback
+  - `status` normalization with default `PENDING_REVIEW`
+  - `robotId` source-of-truth from topic; mismatch logs warning
+  - `detectedAt` fallback to current `Date` when missing/invalid
+  - optional `snapshotPath`/`snapshotUrl` accepted.
+- Added internal LostItem creation path:
+  - `LostItemService.createLostItemFromPatrolEvent(...)`
+- Wired MQTT module to LostItem module for service injection:
+  - `apps/nestar-api/src/robot-comm/mqtt.module.ts` imports `LostItemModule`.
+
+### Explicitly deferred in this phase
+- No snapshot upload API endpoint.
+- No frontend integration.
+- No Python vision module changes.
+- No lost-item WebSocket broadcast.
+- No request/delivery state-flow changes.
+
+### Verification
+- Backend build passed with `npm run build`.
 
 ## Session Update (2026-05-25, LostItem Phase 1 backend foundation)
 

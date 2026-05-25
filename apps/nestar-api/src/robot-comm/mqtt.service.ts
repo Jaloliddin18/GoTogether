@@ -2,11 +2,22 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { InjectModel } from '@nestjs/mongoose';
 import { connect, MqttClient } from 'mqtt';
 import { Model, ObjectId } from 'mongoose';
+import {
+	CreateLostItemFromPatrolEventInput,
+	LostItemService,
+	LostItemLocationInput,
+} from '../components/lost-item/lost-item.service';
 import { shapeIntoMongoObjectId } from '../libs/config';
 import { BookInventory } from '../libs/dto/book-inventory/book-inventory';
 import { RequestTask } from '../libs/dto/request/request';
 import { Robot } from '../libs/dto/robot/robot';
 import { BookInventoryStatus } from '../libs/enums/book-inventory.enum';
+import {
+	LostItemEventType,
+	LostItemObjectType,
+	LostItemPriority,
+	LostItemStatus,
+} from '../libs/enums/lost-item.enum';
 import { RequestErrorCode, RequestStatus } from '../libs/enums/request.enum';
 import { RobotStatus } from '../libs/enums/robot.enum';
 import { RobotGateway } from '../socket/robot.gateway';
@@ -21,6 +32,7 @@ import {
 export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger: Logger = new Logger(MqttRobotService.name);
 	private client: MqttClient | null = null;
+	private readonly lostItemTopic = 'robot/+/lost-item';
 	private readonly subscribedRobotIds: Set<string> = new Set<string>();
 	private readonly offlineTimeouts: Map<string, ReturnType<typeof setTimeout>> =
 		new Map<string, ReturnType<typeof setTimeout>>();
@@ -33,6 +45,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 
 	constructor(
 		private readonly robotGateway: RobotGateway,
+		private readonly lostItemService: LostItemService,
 		@InjectModel('Robot') private readonly robotModel: Model<Robot>,
 		@InjectModel('Request') private readonly requestModel: Model<RequestTask>,
 		@InjectModel('BookInventory')
@@ -65,6 +78,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 
 		this.client.on('connect', () => {
 			this.logger.log(`MQTT connected successfully (${maskedBrokerUrl})`);
+			this.subscribeLostItemTopic();
 			this.resubscribeKnownRobotTopics();
 		});
 
@@ -171,6 +185,20 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		});
 	}
 
+	private subscribeLostItemTopic(): void {
+		if (!this.client || !this.client.connected) return;
+
+		this.client.subscribe(this.lostItemTopic, (error?: Error) => {
+			if (error) {
+				this.logger.error(
+					`Failed MQTT subscribe for topic=${this.lostItemTopic}: ${error.message}`,
+				);
+				return;
+			}
+			this.logger.log(`Subscribed MQTT topic: ${this.lostItemTopic}`);
+		});
+	}
+
 	private resubscribeKnownRobotTopics(): void {
 		for (const robotId of this.subscribedRobotIds) {
 			this.subscribeRobotTopicsNow(robotId);
@@ -182,7 +210,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		rawMessage: string,
 	): Promise<void> {
 		const topicMatch: RegExpMatchArray | null = topic.match(
-			/^robot\/([^/]+)\/(status|pose)$/,
+			/^robot\/([^/]+)\/(status|pose|lost-item)$/,
 		);
 		if (!topicMatch) {
 			this.logger.warn(`MQTT message received on unsupported topic=${topic}`);
@@ -200,7 +228,11 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			return;
 		}
 
-		if (!parsedPayload || typeof parsedPayload !== 'object') {
+		if (
+			!parsedPayload ||
+			typeof parsedPayload !== 'object' ||
+			Array.isArray(parsedPayload)
+		) {
 			this.logger.warn(`Invalid payload shape on topic=${topic}`);
 			return;
 		}
@@ -214,7 +246,15 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			return;
 		}
 
-		await this.onPoseMessage(robotId, parsedPayload as MqttPosePayload);
+		if (topicType === 'pose') {
+			await this.onPoseMessage(robotId, parsedPayload as MqttPosePayload);
+			return;
+		}
+
+		await this.onLostItemMessage(
+			robotId,
+			parsedPayload as Record<string, unknown>,
+		);
 	}
 
 	private async onStatusMessage(
@@ -497,6 +537,230 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				`Failed handling MQTT pose message for robotId=${robotId}: ${errorMessage}`,
 			);
 		}
+	}
+
+	private async onLostItemMessage(
+		topicRobotId: string,
+		payload: Record<string, unknown>,
+	): Promise<void> {
+		const normalizedPayload = this.normalizeLostItemPayload(
+			topicRobotId,
+			payload,
+		);
+		if (!normalizedPayload) return;
+
+		try {
+			const saved = await this.lostItemService.createLostItemFromPatrolEvent(
+				normalizedPayload,
+			);
+			this.logger.log(
+				`Lost item saved robotId=${saved.robotId} objectType=${saved.objectType} lostItemId=${saved._id}`,
+			);
+		} catch (error: unknown) {
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
+			this.logger.error(
+				`Failed saving lost-item event robotId=${normalizedPayload.robotId}: ${errorMessage}`,
+			);
+		}
+	}
+
+	private normalizeLostItemPayload(
+		topicRobotId: string,
+		payload: Record<string, unknown>,
+	): CreateLostItemFromPatrolEventInput | null {
+		const eventTypeRaw = this.toUppercaseString(payload.eventType);
+		if (eventTypeRaw !== LostItemEventType.LOST_ITEM_DETECTED) {
+			this.logger.warn(
+				`Dropping lost-item payload due to invalid eventType topicRobotId=${topicRobotId} eventType=${String(payload.eventType)}`,
+			);
+			return null;
+		}
+
+		const payloadRobotId = this.toOptionalString(payload.robotId);
+		const resolvedRobotId = topicRobotId?.trim() || payloadRobotId;
+
+		if (!resolvedRobotId) {
+			this.logger.warn(
+				'Dropping lost-item payload due to missing robotId in topic and payload',
+			);
+			return null;
+		}
+
+		if (payloadRobotId && payloadRobotId !== topicRobotId) {
+			this.logger.warn(
+				`Lost-item robotId mismatch topic=${topicRobotId} payload=${payloadRobotId}; using topic robotId`,
+			);
+		}
+
+		const confidence = this.normalizeLostItemConfidence(payload.confidence);
+		if (confidence === null) {
+			this.logger.warn(
+				`Dropping lost-item payload due to invalid confidence robotId=${resolvedRobotId} value=${String(payload.confidence)}`,
+			);
+			return null;
+		}
+
+		const objectType = this.normalizeLostItemObjectType(payload.objectType);
+		const priority = this.normalizeLostItemPriority(payload.priority, objectType);
+		const status = this.normalizeLostItemStatus(payload.status);
+		const detectedAt = this.normalizeLostItemDetectedAt(
+			payload.detectedAt,
+			resolvedRobotId,
+		);
+		const location = this.normalizeLostItemLocation(payload.location);
+
+		return {
+			robotId: resolvedRobotId,
+			eventType: LostItemEventType.LOST_ITEM_DETECTED,
+			objectType,
+			confidence,
+			priority,
+			detectedAt,
+			snapshotPath: this.toOptionalString(payload.snapshotPath),
+			snapshotUrl: this.toOptionalString(payload.snapshotUrl),
+			location,
+			status,
+			notes: this.toOptionalString(payload.notes),
+		};
+	}
+
+	private normalizeLostItemObjectType(rawObjectType: unknown): LostItemObjectType {
+		const normalized = this.toUppercaseString(rawObjectType)?.replace(/-/g, '_');
+		switch (normalized) {
+			case LostItemObjectType.ID_CARD:
+				return LostItemObjectType.ID_CARD;
+			case LostItemObjectType.BOTTLE:
+				return LostItemObjectType.BOTTLE;
+			case LostItemObjectType.WALLET:
+				return LostItemObjectType.WALLET;
+			case LostItemObjectType.PHONE:
+				return LostItemObjectType.PHONE;
+			case LostItemObjectType.BOOK:
+				return LostItemObjectType.BOOK;
+			default:
+				return LostItemObjectType.UNKNOWN;
+		}
+	}
+
+	private normalizeLostItemPriority(
+		rawPriority: unknown,
+		objectType: LostItemObjectType,
+	): LostItemPriority {
+		const normalized = this.toUppercaseString(rawPriority);
+		if (normalized === LostItemPriority.HIGH) return LostItemPriority.HIGH;
+		if (normalized === LostItemPriority.MEDIUM) return LostItemPriority.MEDIUM;
+		if (normalized === LostItemPriority.LOW) return LostItemPriority.LOW;
+
+		if (
+			objectType === LostItemObjectType.ID_CARD ||
+			objectType === LostItemObjectType.WALLET ||
+			objectType === LostItemObjectType.PHONE
+		) {
+			return LostItemPriority.HIGH;
+		}
+
+		if (objectType === LostItemObjectType.BOOK) {
+			return LostItemPriority.MEDIUM;
+		}
+
+		return LostItemPriority.LOW;
+	}
+
+	private normalizeLostItemStatus(rawStatus: unknown): LostItemStatus {
+		const normalized = this.toUppercaseString(rawStatus);
+		if (normalized === LostItemStatus.PENDING_REVIEW) {
+			return LostItemStatus.PENDING_REVIEW;
+		}
+		if (normalized === LostItemStatus.COLLECTED) {
+			return LostItemStatus.COLLECTED;
+		}
+		if (normalized === LostItemStatus.DISMISSED) {
+			return LostItemStatus.DISMISSED;
+		}
+		return LostItemStatus.PENDING_REVIEW;
+	}
+
+	private normalizeLostItemConfidence(rawConfidence: unknown): number | null {
+		if (typeof rawConfidence !== 'number' || Number.isNaN(rawConfidence)) {
+			return null;
+		}
+
+		if (rawConfidence < 0 || rawConfidence > 1) {
+			return null;
+		}
+
+		return rawConfidence;
+	}
+
+	private normalizeLostItemDetectedAt(
+		rawDetectedAt: unknown,
+		robotId: string,
+	): Date {
+		if (rawDetectedAt instanceof Date && !Number.isNaN(rawDetectedAt.getTime())) {
+			return rawDetectedAt;
+		}
+
+		if (typeof rawDetectedAt === 'string' && rawDetectedAt.trim()) {
+			const parsedDate = new Date(rawDetectedAt);
+			if (!Number.isNaN(parsedDate.getTime())) {
+				return parsedDate;
+			}
+		}
+
+		this.logger.warn(
+			`Invalid or missing lost-item detectedAt; using current Date for robotId=${robotId}`,
+		);
+		return new Date();
+	}
+
+	private normalizeLostItemLocation(
+		rawLocation: unknown,
+	): LostItemLocationInput | undefined {
+		if (!rawLocation || typeof rawLocation !== 'object' || Array.isArray(rawLocation)) {
+			return undefined;
+		}
+
+		const locationRecord = rawLocation as Record<string, unknown>;
+		const location: LostItemLocationInput = {};
+		const source = this.toOptionalString(locationRecord.source);
+		const floorId = this.toOptionalString(locationRecord.floorId);
+		const patrolCheckpoint = this.toOptionalString(
+			locationRecord.patrolCheckpoint,
+		);
+		const x = this.normalizeOptionalCoordinate(locationRecord.x);
+		const y = this.normalizeOptionalCoordinate(locationRecord.y);
+
+		if (source !== undefined) location.source = source;
+		if (floorId !== undefined) location.floorId = floorId;
+		if (patrolCheckpoint !== undefined) {
+			location.patrolCheckpoint = patrolCheckpoint;
+		}
+		if (x !== undefined) location.x = x;
+		if (y !== undefined) location.y = y;
+
+		return Object.keys(location).length ? location : undefined;
+	}
+
+	private normalizeOptionalCoordinate(
+		rawCoordinate: unknown,
+	): number | null | undefined {
+		if (rawCoordinate === null) return null;
+		if (typeof rawCoordinate === 'number' && !Number.isNaN(rawCoordinate)) {
+			return rawCoordinate;
+		}
+		return undefined;
+	}
+
+	private toOptionalString(value: unknown): string | undefined {
+		if (typeof value !== 'string') return undefined;
+		const trimmedValue = value.trim();
+		return trimmedValue ? trimmedValue : undefined;
+	}
+
+	private toUppercaseString(value: unknown): string | undefined {
+		const trimmedValue = this.toOptionalString(value);
+		return trimmedValue?.toUpperCase();
 	}
 
 	private startOfflineTimeout(robotId: string, requestId: string): void {

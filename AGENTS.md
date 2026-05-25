@@ -303,3 +303,40 @@ If a bad commit was made and not pushed, suggest:
 
 ### Verification
 - `npm run build` passed.
+
+---
+
+## Session Update (2026-05-26) — LostItem Phase 2 MQTT ingestion
+
+### Completed
+- Extended MQTT runtime to subscribe patrol lost-item topic:
+  - wildcard topic: `robot/+/lost-item`
+  - existing per-robot status/pose topic behavior preserved.
+- Extended MQTT topic parser to handle:
+  - `robot/{robotId}/status`
+  - `robot/{robotId}/pose`
+  - `robot/{robotId}/lost-item`
+- Added lost-item payload normalization/validation in MQTT service:
+  - requires `eventType = LOST_ITEM_DETECTED`
+  - validates `confidence` in `[0, 1]` (invalid payloads dropped)
+  - normalizes `objectType` (`id_card`, `bottle`, etc. to enum values)
+  - normalizes/fallbacks `priority` and `status`
+  - uses topic `robotId` as source of truth on mismatch
+  - accepts missing `snapshotUrl`/`snapshotPath` for this phase
+  - uses current time when `detectedAt` is missing/invalid.
+- Added internal LostItem creation path used by MQTT:
+  - `LostItemService.createLostItemFromPatrolEvent(...)`
+- Wired MQTT module to consume LostItem service via module import.
+
+### Explicitly deferred
+- No image upload endpoint in this phase.
+- No WebSocket push event for lost-item in this phase.
+- No frontend or Python vision module changes in this phase.
+- No request/delivery flow/status logic changes in this phase.
+
+### Verification
+- `npm run build` passed after Phase 2 changes.
+
+### Operational rule from this session
+- Lost-item ingestion must remain resilient and non-blocking:
+  malformed payloads are warned and dropped without affecting ongoing status/pose telemetry handling.

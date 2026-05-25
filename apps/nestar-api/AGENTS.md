@@ -138,3 +138,27 @@ Operational boundary for this phase:
 - Do not add MQTT lost-item subscription in this step.
 - Do not add robot snapshot upload endpoint in this step.
 - Keep request/robot delivery runtime flow unchanged.
+
+---
+
+## Session Update (2026-05-26) — LostItem Phase 2 MQTT listener baseline
+
+- `src/robot-comm/mqtt.service.ts` now subscribes to wildcard patrol topic:
+  - `robot/+/lost-item`
+- MQTT incoming topic parser now supports:
+  - `status`, `pose`, and `lost-item`
+- Added safe lost-item ingestion flow:
+  - JSON parse guard + payload shape guard
+  - `eventType` must be `LOST_ITEM_DETECTED`
+  - confidence validation (`0..1`) with malformed payload drop
+  - object type/priority/status normalization + defaults
+  - `robotId` mismatch rule: prefer topic robotId, warn on mismatch
+  - `detectedAt` fallback to current Date when invalid
+- Added LostItem creation method for internal MQTT use:
+  - `LostItemService.createLostItemFromPatrolEvent(...)`
+- `src/robot-comm/mqtt.module.ts` now imports `LostItemModule` for service injection.
+
+Operational boundary for this phase:
+- Preserve existing status/pose subscription and handling behavior.
+- Do not add snapshot upload endpoint here.
+- Do not add frontend/socket lost-item broadcast in this step.
