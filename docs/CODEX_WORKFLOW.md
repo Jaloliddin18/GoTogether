@@ -146,3 +146,19 @@ For LostItem Phase 2 backend work:
 - Do not add image upload API in Phase 2.
 - Do not add frontend changes in Phase 2.
 - Run `npm run build` after MQTT/LostItem integration edits.
+
+---
+
+## Session Note (2026-05-26) — LostItem Phase 3 workflow boundary
+
+For LostItem Phase 3 backend work:
+- Add only a lost-item-specific snapshot upload API.
+- Keep existing generic member upload mutations unchanged.
+- Keep existing MQTT status/pose/lost-item ingestion behavior unchanged.
+- Keep upload destination constrained to `uploads/lost-items` only.
+- Validate file type to png/jpg/jpeg and enforce size limit aligned with existing upload config.
+- Return backend-consumable relative paths (for media resolver compatibility).
+- Do not create LostItem DB records from upload mutation (DB creation remains MQTT-event flow).
+- Do not add frontend changes in Phase 3.
+- Do not add Python vision module changes in Phase 3.
+- Run `npm run build` after upload API integration edits.

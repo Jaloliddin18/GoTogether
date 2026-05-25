@@ -1,12 +1,22 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import {
+	createWriteStream,
+	existsSync,
+	mkdirSync,
+	unlinkSync,
+} from 'fs';
+import { FileUpload } from 'graphql-upload';
 import { Model } from 'mongoose';
+import * as path from 'path';
 import {
 	LostItem,
+	LostItemSnapshotUploadResult,
 	LostItems,
 } from '../../libs/dto/lost-item/lost-item';
 import { LostItemsInquiry } from '../../libs/dto/lost-item/lost-item.input';
 import { UpdateLostItemStatusInput } from '../../libs/dto/lost-item/lost-item.update';
+import { getSerialForImage, validMimeTypes } from '../../libs/config';
 import { Direction, Message } from '../../libs/enums/common.enum';
 import {
 	LostItemEventType,
@@ -40,10 +50,38 @@ export interface CreateLostItemFromPatrolEventInput {
 
 @Injectable()
 export class LostItemService {
+	private readonly lostItemSnapshotMaxFileSize = 1_500_000;
+	private readonly lostItemSnapshotDir = path.join(
+		process.cwd(),
+		'uploads',
+		'lost-items',
+	);
+
 	constructor(
 		@InjectModel('LostItem')
 		private readonly lostItemModel: Model<LostItem>,
 	) {}
+
+	public async uploadLostItemSnapshot(
+		file: FileUpload,
+	): Promise<LostItemSnapshotUploadResult> {
+		const { createReadStream, filename, mimetype } = file;
+		if (!filename)
+			throw new InternalServerErrorException(Message.UPLOAD_FAILED);
+		const validMime = validMimeTypes.includes(mimetype);
+		if (!validMime)
+			throw new InternalServerErrorException(Message.PROVIDE_ALLOWED_FORMAT);
+
+		this.ensureLostItemSnapshotDir();
+
+		const imageName = getSerialForImage(filename);
+		const snapshotPath = `uploads/lost-items/${imageName}`;
+		const snapshotAbsolutePath = path.join(process.cwd(), snapshotPath);
+
+		await this.streamUploadToFile(createReadStream, snapshotAbsolutePath);
+
+		return { snapshotPath, snapshotUrl: snapshotPath };
+	}
 
 	public async createLostItemFromPatrolEvent(
 		input: CreateLostItemFromPatrolEventInput,
@@ -117,6 +155,57 @@ export class LostItemService {
 			match.detectedAt = {};
 			if (detectedAtFrom) match.detectedAt.$gte = detectedAtFrom;
 			if (detectedAtTo) match.detectedAt.$lte = detectedAtTo;
+		}
+	}
+
+	private ensureLostItemSnapshotDir(): void {
+		if (existsSync(this.lostItemSnapshotDir)) return;
+		mkdirSync(this.lostItemSnapshotDir, { recursive: true });
+	}
+
+	private async streamUploadToFile(
+		createReadStream: FileUpload['createReadStream'],
+		filePath: string,
+	): Promise<void> {
+		const stream = createReadStream();
+		const writeStream = createWriteStream(filePath);
+		let uploadedBytes = 0;
+		let completed = false;
+
+		await new Promise<void>((resolve, reject) => {
+			const failUpload = (message: Message): void => {
+				if (completed) return;
+				completed = true;
+				stream.destroy();
+				writeStream.destroy();
+				this.removePartialUploadedFile(filePath);
+				reject(new InternalServerErrorException(message));
+			};
+
+			stream.on('data', (chunk: Buffer | string) => {
+				uploadedBytes +=
+					typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.length;
+				if (uploadedBytes > this.lostItemSnapshotMaxFileSize)
+					failUpload(Message.UPLOAD_FAILED);
+			});
+
+			stream.on('error', () => failUpload(Message.UPLOAD_FAILED));
+			writeStream.on('error', () => failUpload(Message.UPLOAD_FAILED));
+			writeStream.on('finish', () => {
+				if (completed) return;
+				completed = true;
+				resolve();
+			});
+
+			stream.pipe(writeStream);
+		});
+	}
+
+	private removePartialUploadedFile(filePath: string): void {
+		try {
+			if (existsSync(filePath)) unlinkSync(filePath);
+		} catch {
+			/** noop */
 		}
 	}
 }

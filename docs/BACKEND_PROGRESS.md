@@ -199,8 +199,31 @@
   - malformed payloads are warned/dropped without crashing backend
   - no lost-item WebSocket emit yet.
 
+### 3.9 LostItem Phase 3 snapshot upload API (2026-05-26)
+- Added lost-item-specific upload mutation:
+  - `uploadLostItemSnapshot(file: Upload!): LostItemSnapshotUploadResult`
+  - location: `apps/nestar-api/src/components/lost-item/lost-item.resolver.ts`
+  - guard: admin-only (`RolesGuard` + `MemberType.ADMIN`)
+- Added upload result DTO:
+  - `LostItemSnapshotUploadResult { snapshotPath, snapshotUrl }`
+  - location: `apps/nestar-api/src/libs/dto/lost-item/lost-item.ts`
+- Added upload service implementation:
+  - `LostItemService.uploadLostItemSnapshot(...)`
+  - location: `apps/nestar-api/src/components/lost-item/lost-item.service.ts`
+  - fixed destination folder: `uploads/lost-items/`
+  - auto-create directory if missing
+  - MIME allowlist: `image/png`, `image/jpg`, `image/jpeg`
+  - size limit guard: `1_500_000` bytes
+  - unique file naming via existing image serial helper
+  - return format: `uploads/lost-items/<filename>` for both `snapshotPath` and `snapshotUrl`
+  - partial file cleanup on failed upload.
+- Phase 3 boundaries preserved:
+  - no change to generic member upload mutations
+  - no LostItem DB write in upload mutation (DB write remains MQTT-event flow)
+  - no MQTT lost-item ingestion logic changes.
+
 ## 4. Build verification
-- `npm run build` passes after Phase 4/5/6 implementation, follow-up fixes, LostItem Phase 1, and LostItem Phase 2.
+- `npm run build` passes after Phase 4/5/6 implementation, follow-up fixes, LostItem Phase 1, LostItem Phase 2, and LostItem Phase 3.
 
 ## 5. Completed runtime tests (confirmed)
 - Local MQTT broker connection works.
@@ -246,8 +269,8 @@
 ## 7. Next project steps
 1. Finish remaining runtime tests:
 - WebSocket client `joinRequest` + event reception
-2. Move to LostItem Phase 3:
-- add snapshot upload API path for robot/vision module.
+2. Move to LostItem Phase 4:
+- connect Python vision module upload + MQTT publish flow using uploaded `snapshotUrl`.
 3. Move to Phase 7:
 - staff/admin dashboard operations (include lost-item morning review list/actions).
 4. Later:

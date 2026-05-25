@@ -79,3 +79,12 @@ export class LostItems {
 	@Field(() => [TotalCounter], { nullable: true })
 	metaCounter: TotalCounter[];
 }
+
+@ObjectType()
+export class LostItemSnapshotUploadResult {
+	@Field(() => String)
+	snapshotPath: string;
+
+	@Field(() => String)
+	snapshotUrl: string;
+}

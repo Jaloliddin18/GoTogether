@@ -162,3 +162,33 @@ Operational boundary for this phase:
 - Preserve existing status/pose subscription and handling behavior.
 - Do not add snapshot upload endpoint here.
 - Do not add frontend/socket lost-item broadcast in this step.
+
+---
+
+## Session Update (2026-05-26) — LostItem Phase 3 snapshot upload baseline
+
+- Added lost-item upload mutation under existing GraphQL upload flow:
+  - `uploadLostItemSnapshot(file: Upload!): LostItemSnapshotUploadResult`
+  - resolver file: `src/components/lost-item/lost-item.resolver.ts`
+- Added new output contract:
+  - `LostItemSnapshotUploadResult { snapshotPath, snapshotUrl }`
+  - dto file: `src/libs/dto/lost-item/lost-item.ts`
+- Added upload service implementation:
+  - method: `LostItemService.uploadLostItemSnapshot(...)`
+  - service file: `src/components/lost-item/lost-item.service.ts`
+  - fixed storage folder: `uploads/lost-items/`
+  - mime validation: png/jpg/jpeg only
+  - size guard: `1_500_000` bytes
+  - unique file naming with existing helper
+  - returns relative path values (`uploads/lost-items/<filename>`).
+- Guard/auth approach for this phase:
+  - admin-only via existing `RolesGuard` + `MemberType.ADMIN`.
+- Preserved boundaries:
+  - no changes to generic member image uploader behavior
+  - no changes to MQTT lost-item ingestion flow
+  - no LostItem DB write from upload mutation (DB write stays MQTT event-driven).
+
+Operational boundary for this phase:
+- Keep upload target controlled (`uploads/lost-items` only).
+- Keep current auth simple/safe (admin token required for now).
+- Defer robot-specific auth mechanism and Python integration wiring to later phase.

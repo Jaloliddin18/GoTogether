@@ -340,3 +340,40 @@ If a bad commit was made and not pushed, suggest:
 ### Operational rule from this session
 - Lost-item ingestion must remain resilient and non-blocking:
   malformed payloads are warned and dropped without affecting ongoing status/pose telemetry handling.
+
+---
+
+## Session Update (2026-05-26) — LostItem Phase 3 snapshot upload API
+
+### Completed
+- Added lost-item-specific GraphQL upload mutation:
+  - `uploadLostItemSnapshot(file: Upload!): LostItemSnapshotUploadResult`
+  - file: `apps/nestar-api/src/components/lost-item/lost-item.resolver.ts`
+  - guard: `@Roles(MemberType.ADMIN)` + `@UseGuards(RolesGuard)`
+- Added upload result DTO:
+  - `LostItemSnapshotUploadResult`
+  - fields: `snapshotPath`, `snapshotUrl`
+  - file: `apps/nestar-api/src/libs/dto/lost-item/lost-item.ts`
+- Added scoped upload service logic:
+  - method: `LostItemService.uploadLostItemSnapshot(...)`
+  - file: `apps/nestar-api/src/components/lost-item/lost-item.service.ts`
+  - upload target is fixed to `uploads/lost-items/` only
+  - directory auto-create uses `mkdirSync(..., { recursive: true })`
+  - allowed MIME: `image/png`, `image/jpg`, `image/jpeg`
+  - unique filename via existing `getSerialForImage(...)`
+  - file size guard set to `1_500_000` bytes (aligned with GraphQL upload middleware)
+  - returns relative path format: `uploads/lost-items/<filename>`
+  - partial failed uploads are removed safely.
+
+### Explicitly preserved/deferred
+- Existing generic `imageUploader` / `imagesUploader` behavior remains unchanged.
+- LostItem DB record creation remains MQTT-driven (upload mutation does not create LostItem docs).
+- Existing lost-item MQTT ingestion behavior was not changed in this phase.
+- No frontend or Python vision module changes in this phase.
+- No request/delivery flow logic changes in this phase.
+
+### Verification
+- `npm run build` passed after Phase 3 changes.
+
+### Operational rule from this session
+- Phase 3 currently requires admin JWT for snapshot upload; Python/robot automation will need either a valid token or a later dedicated robot-auth path.

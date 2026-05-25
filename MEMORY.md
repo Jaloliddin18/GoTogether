@@ -6,6 +6,36 @@
 ## Current Branch
 develop
 
+## Session Update (2026-05-26, LostItem Phase 3 snapshot upload API)
+
+### Completed
+- Added lost-item-specific upload mutation:
+  - `uploadLostItemSnapshot(file: Upload!): LostItemSnapshotUploadResult`
+  - file: `apps/nestar-api/src/components/lost-item/lost-item.resolver.ts`
+  - auth: admin-only (`RolesGuard` + `MemberType.ADMIN`)
+- Added upload result DTO:
+  - `LostItemSnapshotUploadResult` with `snapshotPath` and `snapshotUrl`
+  - file: `apps/nestar-api/src/libs/dto/lost-item/lost-item.ts`
+- Added upload service implementation:
+  - `LostItemService.uploadLostItemSnapshot(...)`
+  - file: `apps/nestar-api/src/components/lost-item/lost-item.service.ts`
+  - fixed upload destination: `uploads/lost-items/`
+  - auto-create missing directory
+  - MIME validation: `image/png`, `image/jpg`, `image/jpeg`
+  - size limit guard: `1_500_000` bytes
+  - unique file names via existing `getSerialForImage(...)`
+  - returns relative path format: `uploads/lost-items/<filename>`
+  - removes partial file when upload fails.
+
+### Explicitly preserved/deferred in this phase
+- No change to generic member upload mutations (`imageUploader`, `imagesUploader`).
+- No LostItem DB creation in upload mutation (still MQTT event-driven).
+- No MQTT lost-item flow change.
+- No frontend and Python module changes.
+
+### Verification
+- Backend build passed with `npm run build`.
+
 ## Session Update (2026-05-26, LostItem Phase 2 MQTT ingestion)
 
 ### Completed

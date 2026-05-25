@@ -270,3 +270,33 @@ JWT_SECRET=
 
 ### Verification
 - `npm run build` passed after Phase 2 integration.
+
+---
+
+## Session Update (2026-05-26) — LostItem Phase 3 snapshot upload API
+
+### Completed
+- Added lost-item-specific upload mutation in LostItem resolver:
+  - `uploadLostItemSnapshot(file: Upload!): LostItemSnapshotUploadResult`
+  - guarded as admin-only with existing `RolesGuard`.
+- Added new GraphQL output type:
+  - `LostItemSnapshotUploadResult` with `snapshotPath` and `snapshotUrl`.
+- Added upload implementation in LostItem service:
+  - validates MIME (`image/png`, `image/jpg`, `image/jpeg`)
+  - enforces size guard (`1_500_000` bytes)
+  - auto-creates upload directory when missing
+  - writes only to `uploads/lost-items/`
+  - returns relative path format `uploads/lost-items/<filename>`
+  - cleans partial file on failed upload.
+
+### Explicitly preserved/deferred
+- Existing generic `imageUploader` / `imagesUploader` behavior is unchanged.
+- Upload mutation does not create LostItem DB documents.
+- MQTT lost-item listener/save logic unchanged.
+- No frontend or Python module changes in this phase.
+
+### Verification
+- `npm run build` passed after Phase 3 changes.
+
+### Phase boundary note
+- Current upload path requires authenticated admin token; robot-specific non-member auth can be added in a later phase if needed.

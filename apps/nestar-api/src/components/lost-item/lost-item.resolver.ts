@@ -3,6 +3,7 @@ import { UseGuards } from '@nestjs/common';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import {
 	LostItem,
+	LostItemSnapshotUploadResult,
 	LostItems,
 } from '../../libs/dto/lost-item/lost-item';
 import { LostItemsInquiry } from '../../libs/dto/lost-item/lost-item.input';
@@ -11,6 +12,7 @@ import { MemberType } from '../../libs/enums/member.enum';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { LostItemService } from './lost-item.service';
+import { FileUpload, GraphQLUpload } from 'graphql-upload';
 
 @Resolver()
 export class LostItemResolver {
@@ -35,5 +37,16 @@ export class LostItemResolver {
 		console.log('Mutation: updateLostItemStatus');
 		input.lostItemId = shapeIntoMongoObjectId(input.lostItemId);
 		return await this.lostItemService.updateLostItemStatus(input);
+	}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Mutation(() => LostItemSnapshotUploadResult)
+	public async uploadLostItemSnapshot(
+		@Args({ name: 'file', type: () => GraphQLUpload })
+		file: FileUpload,
+	): Promise<LostItemSnapshotUploadResult> {
+		console.log('Mutation: uploadLostItemSnapshot');
+		return await this.lostItemService.uploadLostItemSnapshot(file);
 	}
 }
