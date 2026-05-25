@@ -377,3 +377,30 @@ If a bad commit was made and not pushed, suggest:
 
 ### Operational rule from this session
 - Phase 3 currently requires admin JWT for snapshot upload; Python/robot automation will need either a valid token or a later dedicated robot-auth path.
+
+---
+
+## Session Update (2026-05-26) — Request READY timeline dedupe hardening
+
+### Completed
+- Hardened request-status lifecycle to prevent duplicate `READY` timeline entries and stale post-`READY` regressions.
+- Updated MQTT status telemetry handling in `apps/nestar-api/src/robot-comm/mqtt.service.ts`:
+  - added semantic `hasReachedReady(...)` guard (checks status and timeline history, not only current status)
+  - ignores duplicate `READY` telemetry after READY already exists in timeline
+  - ignores stale non-terminal movement statuses after READY (e.g. `ARRIVED_AT_STUDENT`, `DELIVERING`, `NAVIGATING_TO_SHELF`)
+  - moved request status write into guarded atomic update path to reduce out-of-order race regressions.
+- Updated admin/manual status mutation path in `apps/nestar-api/src/components/request/request.service.ts`:
+  - ignores duplicate `READY` updates
+  - ignores stale movement-status updates after READY
+  - preserves existing terminal guards (`COMPLETED`, `FAILED`, `CANCELLED`) unchanged.
+- Added explicit warning logs when duplicate/stale READY-related updates are ignored.
+
+### Explicitly preserved
+- No frontend changes.
+- No Python vision module changes.
+- No LostItem patrol flow changes.
+- No DB schema changes.
+- BORROW/PURCHASE inventory completion/release behavior unchanged.
+
+### Verification
+- `npm run build` passed.

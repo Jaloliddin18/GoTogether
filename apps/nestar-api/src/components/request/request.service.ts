@@ -3,6 +3,7 @@ import {
 	ForbiddenException,
 	Injectable,
 	InternalServerErrorException,
+	Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, ObjectId, PipelineStage } from 'mongoose';
@@ -33,6 +34,7 @@ import {
 } from '../../libs/dto/request/request.input';
 import {
 	CancelRequestInput,
+	ConfirmRequestPickupInput,
 	UpdateRequestStatusInput,
 } from '../../libs/dto/request/request.update';
 import { BookInventory } from '../../libs/dto/book-inventory/book-inventory';
@@ -55,8 +57,24 @@ const CHARGING_DOCK_DESTINATION = {
 	theta: 0,
 } as const;
 
+const STALE_STATUSES_AFTER_READY: RequestStatus[] = [
+	RequestStatus.QUEUED,
+	RequestStatus.ASSIGNED,
+	RequestStatus.DISPATCHED,
+	RequestStatus.NAVIGATING_TO_SHELF,
+	RequestStatus.ARRIVED_AT_SHELF,
+	RequestStatus.VERIFYING_BOOK,
+	RequestStatus.BOOK_FOUND,
+	RequestStatus.BOOK_NOT_FOUND,
+	RequestStatus.PICKING_UP,
+	RequestStatus.DELIVERING,
+	RequestStatus.ARRIVED_AT_STUDENT,
+];
+
 @Injectable()
 export class RequestService {
+	private readonly logger = new Logger(RequestService.name);
+
 	constructor(
 		@InjectModel('Request') private readonly requestModel: Model<RequestTask>,
 		@InjectModel('Book') private readonly bookModel: Model<Book>,
@@ -294,7 +312,15 @@ export class RequestService {
 	): Promise<RequestTask> {
 		const target = await this.requestModel.findOne({ _id: requestId }).exec();
 		if (!target) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
-		if (target.status === input.status) return target;
+		const requestIdLabel = String(requestId);
+		if (target.status === input.status) {
+			if (input.status === RequestStatus.READY) {
+				this.logger.warn(
+					`Ignoring duplicate READY update for requestId=${requestIdLabel}; current status is already READY`,
+				);
+			}
+			return target;
+		}
 		if (
 			[
 				RequestStatus.COMPLETED,
@@ -303,6 +329,19 @@ export class RequestService {
 			].includes(target.status)
 		) {
 			throw new BadRequestException(Message.NOT_ALLOWED_REQUEST);
+		}
+		const readyAlreadyReached = this.hasReachedReady(target);
+		if (readyAlreadyReached && input.status === RequestStatus.READY) {
+			this.logger.warn(
+				`Ignoring duplicate READY update for requestId=${requestIdLabel}; READY already exists in timeline`,
+			);
+			return target;
+		}
+		if (readyAlreadyReached && this.isStaleStatusAfterReady(input.status)) {
+			this.logger.warn(
+				`Ignoring stale status update ${input.status} for requestId=${requestIdLabel}; READY already exists in timeline`,
+			);
+			return target;
 		}
 
 		const update: T = {
@@ -453,6 +492,42 @@ export class RequestService {
 		}
 
 		return result;
+	}
+
+	public async confirmRequestPickup(
+		requestId: ObjectId,
+		input: ConfirmRequestPickupInput,
+		authMember?: Member,
+	): Promise<RequestTask> {
+		const target = await this.requestModel.findOne({ _id: requestId }).exec();
+		if (!target) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+		if (target.status === RequestStatus.COMPLETED) return target;
+		if (
+			target.status !== RequestStatus.READY &&
+			target.status !== RequestStatus.ARRIVED_AT_STUDENT
+		) {
+			throw new BadRequestException(Message.NOT_ALLOWED_REQUEST);
+		}
+
+		const isAdmin = authMember?.memberType === MemberType.ADMIN;
+		if (!isAdmin) {
+			if (authMember?._id && target.memberId) {
+				const ownerMatches = String(target.memberId) === String(authMember._id);
+				if (!ownerMatches) throw new ForbiddenException(Message.NOT_ALLOWED_REQUEST);
+			} else if (target.sessionId) {
+				if (!input.sessionId || input.sessionId !== target.sessionId) {
+					throw new ForbiddenException(Message.NOT_ALLOWED_REQUEST);
+				}
+			} else {
+				throw new ForbiddenException(Message.NOT_ALLOWED_REQUEST);
+			}
+		}
+
+		return await this.updateRequestStatus(requestId, {
+			requestId: input.requestId,
+			status: RequestStatus.COMPLETED,
+			message: 'Pickup confirmed by user.',
+		});
 	}
 
 	private shapeMatchQuery(match: T, input: RequestsInquiry): void {
@@ -606,6 +681,28 @@ export class RequestService {
 			message: message ?? '',
 			timestamp: new Date(),
 		};
+	}
+
+	private hasTimelineStatus(
+		request: Pick<RequestTask, 'timeline'> | null | undefined,
+		status: RequestStatus,
+	): boolean {
+		return Boolean(
+			request?.timeline?.some((timelineItem) => timelineItem?.status === status),
+		);
+	}
+
+	private hasReachedReady(
+		request: Pick<RequestTask, 'status' | 'timeline'> | null | undefined,
+	): boolean {
+		return (
+			request?.status === RequestStatus.READY ||
+			this.hasTimelineStatus(request, RequestStatus.READY)
+		);
+	}
+
+	private isStaleStatusAfterReady(status: RequestStatus): boolean {
+		return STALE_STATUSES_AFTER_READY.includes(status);
 	}
 
 	private async reserveInventory(input: {

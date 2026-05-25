@@ -9,6 +9,7 @@ import {
 } from '../../libs/dto/request/request.input';
 import {
 	CancelRequestInput,
+	ConfirmRequestPickupInput,
 	UpdateRequestStatusInput,
 } from '../../libs/dto/request/request.update';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -59,7 +60,6 @@ export class RequestResolver {
 		@Args('input') input: SessionRequestsInquiry,
 		@AuthMember('_id') memberId: ObjectId,
 	): Promise<Requests> {
-		console.log('Query: getSessionRequests');
 		return await this.requestService.getSessionRequests(input, memberId);
 	}
 
@@ -83,5 +83,20 @@ export class RequestResolver {
 		console.log('Mutation: cancelRequest');
 		const requestId = shapeIntoMongoObjectId(input.requestId);
 		return await this.requestService.cancelRequest(requestId, input, authMember);
+	}
+
+	@UseGuards(WithoutGuard)
+	@Mutation(() => RequestTask)
+	public async confirmRequestPickup(
+		@Args('input') input: ConfirmRequestPickupInput,
+		@AuthMember() authMember: Member,
+	): Promise<RequestTask> {
+		console.log('Mutation: confirmRequestPickup');
+		const requestId = shapeIntoMongoObjectId(input.requestId);
+		return await this.requestService.confirmRequestPickup(
+			requestId,
+			input,
+			authMember,
+		);
 	}
 }

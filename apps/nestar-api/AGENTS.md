@@ -192,3 +192,23 @@ Operational boundary for this phase:
 - Keep upload target controlled (`uploads/lost-items` only).
 - Keep current auth simple/safe (admin token required for now).
 - Defer robot-specific auth mechanism and Python integration wiring to later phase.
+
+---
+
+## Session Update (2026-05-26) — READY timeline dedupe and stale telemetry guard
+
+- Request delivery telemetry path now treats READY as a semantic milestone:
+  - once READY exists in request timeline, later stale non-terminal delivery statuses are ignored
+  - duplicate READY telemetry is ignored and logged
+  - request timeline no longer appends READY more than once for the same request.
+- Backend mutation guard was aligned:
+  - manual/admin `updateRequestStatus` ignores duplicate READY updates
+  - stale movement statuses after READY are rejected.
+- Existing terminal behavior remains unchanged:
+  - `COMPLETED`, `FAILED`, `CANCELLED` guard logic preserved.
+- Scope preserved for this fix:
+  - no frontend changes
+  - no Python vision module changes
+  - no LostItem module/runtime changes.
+- Verification:
+  - `npm run build` passed.

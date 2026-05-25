@@ -46,3 +46,15 @@ export class CancelRequestInput {
 	@Field(() => String, { nullable: true })
 	reason?: string;
 }
+
+@InputType()
+export class ConfirmRequestPickupInput {
+	@IsNotEmpty()
+	@Field(() => String)
+	requestId: string;
+
+	@IsOptional()
+	@IsString()
+	@Field(() => String, { nullable: true })
+	sessionId?: string;
+}

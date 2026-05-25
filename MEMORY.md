@@ -413,3 +413,30 @@ develop
 - COMMERCIAL inventory ID: `69f664b04d9e6330d4a5fab2`
 - Robot ID: `69f6670e997c6e5d143bd0d5`
 - robotId string: `robot_01`
+
+## Session Update (2026-05-26, READY timeline duplicate hardening)
+
+### Root cause
+- Duplicate READY timeline entries could still occur under out-of-order/concurrent MQTT status telemetry.
+- Prior duplicate protection focused on current status equality; semantic READY history (timeline-level READY reached) was not fully enforced across all update paths.
+
+### Completed
+- Hardened MQTT request-status updates in `apps/nestar-api/src/robot-comm/mqtt.service.ts`:
+  - added `hasReachedReady(...)` semantic check using both `request.status` and `request.timeline`
+  - added stale-after-READY guard for non-terminal movement statuses
+  - added duplicate READY guard when READY already exists in timeline
+  - switched telemetry status write to guarded conditional update path to avoid race-driven stale regressions.
+- Hardened manual/admin status updates in `apps/nestar-api/src/components/request/request.service.ts`:
+  - duplicate READY updates now no-op with warning
+  - stale movement statuses after READY now no-op with warning
+  - existing terminal-state protections unchanged.
+
+### Explicitly preserved
+- No DB schema changes.
+- No frontend changes.
+- No Python module changes.
+- No LostItem flow changes.
+- BORROW/PURCHASE completion and inventory behaviors unchanged.
+
+### Verification
+- `npm run build` passed after READY dedupe hardening.

@@ -237,9 +237,11 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			return;
 		}
 
-		this.logger.log(
-			`MQTT message received topic=${topic} payload=${JSON.stringify(parsedPayload)}`,
-		);
+		if (topicType !== 'pose') {
+			this.logger.log(
+				`MQTT message received topic=${topic} payload=${JSON.stringify(parsedPayload)}`,
+			);
+		}
 
 		if (topicType === 'status') {
 			await this.onStatusMessage(robotId, parsedPayload as MqttStatusPayload);
@@ -327,6 +329,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 
 			let currentRequest = activeRequest;
 			let requestStatusChanged = false;
+			const readyAlreadyReached = this.hasReachedReady(activeRequest);
 
 			if (this.isTerminalRequestStatus(activeRequest.status)) {
 				if (mappedRequestStatus && mappedRequestStatus !== activeRequest.status) {
@@ -339,33 +342,30 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 					`Unknown RequestStatus mapping for state=${payload.state}; skipping request status update`,
 				);
 			} else if (
-				activeRequest.status === RequestStatus.READY &&
-				mappedRequestStatus !== RequestStatus.READY
+				readyAlreadyReached &&
+				this.isStaleTelemetryStatusAfterReady(mappedRequestStatus)
 			) {
 				this.logger.warn(
-					`Ignoring stale telemetry state=${payload.state} because requestId=${requestId} is already READY`,
+					`Ignoring stale telemetry state=${payload.state} because requestId=${requestId} already reached READY`,
+				);
+			} else if (
+				readyAlreadyReached &&
+				mappedRequestStatus === RequestStatus.READY
+			) {
+				this.logger.warn(
+					`Ignoring duplicate READY telemetry state=${payload.state} for requestId=${requestId}; READY already exists in timeline`,
 				);
 			} else if (activeRequest.status === mappedRequestStatus) {
 				this.logger.log(
 					`Duplicate telemetry state=${mappedRequestStatus} for requestId=${requestId}; skipping timeline append`,
 				);
 			} else {
-				const updatedRequest = await this.requestModel
-					.findOneAndUpdate(
-						{ _id: activeRequest._id },
-						{
-							$set: { status: mappedRequestStatus },
-							$push: {
-								timeline: this.buildTimelineItem(
-									mappedRequestStatus,
-									payload.message,
-									payload.timestamp,
-								),
-							},
-						},
-						{ new: true },
-					)
-					.exec();
+				const updatedRequest = await this.applyTelemetryRequestStatusTransition({
+					requestId: activeRequest._id,
+					nextStatus: mappedRequestStatus,
+					message: payload.message,
+					timestamp: payload.timestamp,
+				});
 
 				if (updatedRequest) {
 					currentRequest = updatedRequest;
@@ -379,6 +379,19 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 
 					if (this.isTerminalRequestStatus(mappedRequestStatus)) {
 						this.clearOfflineTimeout(payloadRobotId);
+					}
+				} else {
+					const latestRequest = await this.requestModel
+						.findOne({ _id: activeRequest._id })
+						.exec();
+					if (latestRequest) {
+						currentRequest = latestRequest;
+						this.logSkippedTelemetryStatusUpdate({
+							request: latestRequest,
+							requestId,
+							mappedRequestStatus,
+							telemetryState: payload.state,
+						});
 					}
 				}
 			}
@@ -441,7 +454,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				});
 				this.clearOfflineTimeout(payloadRobotId);
 				await this.releaseRobotAfterReady(robot._id);
-				if (!requestStatusChanged && activeRequest.status !== RequestStatus.READY) {
+				if (!requestStatusChanged && !this.hasReachedReady(currentRequest)) {
 					this.logger.warn(
 						`READY telemetry received but request status was not updated for requestId=${requestId}`,
 					);
@@ -460,10 +473,6 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		robotId: string,
 		payload: MqttPosePayload,
 	): Promise<void> {
-		this.logger.log(
-			`POSE from ${robotId}: x:${payload.x} y:${payload.y} theta:${payload.theta}`,
-		);
-
 		try {
 			const payloadRobotId: string = payload?.robotId?.trim() || robotId;
 			if (payloadRobotId !== robotId) {
@@ -505,7 +514,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				payloadRequestId: payload.requestId,
 			});
 			if (!activeRequest) {
-				this.logger.log(
+				this.logger.debug(
 					`No active request for robotId=${payloadRobotId}; skipping robotPosition emit`,
 				);
 				return;
@@ -514,9 +523,6 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			const requestId: string = String(activeRequest._id);
 			if (!this.isOfflineTimeoutEligibleStatus(activeRequest.status)) {
 				this.clearOfflineTimeout(payloadRobotId);
-				this.logger.log(
-					`Skipping offline timeout start for robotId=${payloadRobotId}, requestId=${requestId}, status=${activeRequest.status}`,
-				);
 			} else {
 				this.startOfflineTimeout(payloadRobotId, requestId);
 			}
@@ -946,12 +952,9 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 						status: activeStatusFilter,
 					})
 					.exec();
-				if (requestFromPayload) {
-					this.logger.log(
-						`Resolved telemetry requestId=${requestFromPayload._id} via payload.requestId for robotId=${input.robot.robotId}`,
-					);
-					return requestFromPayload;
-				}
+					if (requestFromPayload) {
+						return requestFromPayload;
+					}
 
 				const completedRequestFromPayload = await this.requestModel
 					.findOne({
@@ -960,17 +963,14 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 						status: RequestStatus.COMPLETED,
 					})
 					.exec();
-				if (
-					completedRequestFromPayload &&
-					this.isWithinPostCompletionTelemetryWindow(
-						completedRequestFromPayload.updatedAt,
-					)
-				) {
-					this.logger.log(
-						`Resolved telemetry requestId=${completedRequestFromPayload._id} via payload.requestId for post-completion robotId=${input.robot.robotId}`,
-					);
-					return completedRequestFromPayload;
-				}
+					if (
+						completedRequestFromPayload &&
+						this.isWithinPostCompletionTelemetryWindow(
+							completedRequestFromPayload.updatedAt,
+						)
+					) {
+						return completedRequestFromPayload;
+					}
 			} catch {
 				this.logger.warn(
 					`Invalid payload.requestId format: ${payloadRequestId}`,
@@ -986,22 +986,14 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 					status: activeStatusFilter,
 				})
 				.exec();
-			if (requestFromRobot) {
-				this.logger.log(
-					`Resolved telemetry requestId=${requestFromRobot._id} via robot.currentRequestId for robotId=${input.robot.robotId}`,
-				);
-				return requestFromRobot;
+				if (requestFromRobot) {
+					return requestFromRobot;
+				}
 			}
-		}
 
-		const requestFromFallback = await this.findActiveRequestByRobot(input.robot._id);
-		if (requestFromFallback) {
-			this.logger.log(
-				`Resolved telemetry requestId=${requestFromFallback._id} via active request fallback for robotId=${input.robot.robotId}`,
-			);
+			const requestFromFallback = await this.findActiveRequestByRobot(input.robot._id);
+			return requestFromFallback;
 		}
-		return requestFromFallback;
-	}
 
 	private isWithinPostCompletionTelemetryWindow(
 		updatedAt?: Date,
@@ -1016,6 +1008,106 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		return this.terminalRequestStatuses.includes(status as RequestStatus);
 	}
 
+	private isStaleTelemetryStatusAfterReady(status: RequestStatus): boolean {
+		return status !== RequestStatus.READY && !this.isTerminalRequestStatus(status);
+	}
+
+	private hasTimelineStatus(
+		request: Pick<RequestTask, 'timeline'> | null | undefined,
+		status: RequestStatus,
+	): boolean {
+		return Boolean(
+			request?.timeline?.some((timelineItem) => timelineItem?.status === status),
+		);
+	}
+
+	private hasReachedReady(
+		request: Pick<RequestTask, 'status' | 'timeline'> | null | undefined,
+	): boolean {
+		return (
+			request?.status === RequestStatus.READY ||
+			this.hasTimelineStatus(request, RequestStatus.READY)
+		);
+	}
+
+	private async applyTelemetryRequestStatusTransition(input: {
+		requestId: ObjectId;
+		nextStatus: RequestStatus;
+		message?: string;
+		timestamp?: string;
+	}): Promise<RequestTask | null> {
+		return await this.requestModel
+			.findOneAndUpdate(
+				{
+					_id: input.requestId,
+					status: {
+						$nin: this.terminalRequestStatuses,
+						$ne: input.nextStatus,
+					},
+					timeline: {
+						$not: {
+							$elemMatch: {
+								status: RequestStatus.READY,
+							},
+						},
+					},
+				},
+				{
+					$set: {
+						status: input.nextStatus,
+					},
+					$push: {
+						timeline: this.buildTimelineItem(
+							input.nextStatus,
+							input.message,
+							input.timestamp,
+						),
+					},
+				},
+				{ new: true },
+			)
+			.exec();
+	}
+
+	private logSkippedTelemetryStatusUpdate(input: {
+		request: RequestTask;
+		requestId: string;
+		mappedRequestStatus: RequestStatus;
+		telemetryState: string;
+	}): void {
+		if (this.hasReachedReady(input.request)) {
+			if (input.mappedRequestStatus === RequestStatus.READY) {
+				this.logger.warn(
+					`Ignoring duplicate READY telemetry state=${input.telemetryState} for requestId=${input.requestId}; READY already exists in timeline`,
+				);
+				return;
+			}
+
+			this.logger.warn(
+				`Ignoring stale telemetry state=${input.telemetryState} because requestId=${input.requestId} already reached READY`,
+			);
+			return;
+		}
+
+		if (this.isTerminalRequestStatus(input.request.status)) {
+			this.logger.log(
+				`Ignoring telemetry state=${input.telemetryState} because requestId=${input.requestId} is terminal (${input.request.status})`,
+			);
+			return;
+		}
+
+		if (input.request.status === input.mappedRequestStatus) {
+			this.logger.log(
+				`Duplicate telemetry state=${input.mappedRequestStatus} for requestId=${input.requestId}; skipping timeline append`,
+			);
+			return;
+		}
+
+		this.logger.warn(
+			`Skipped telemetry transition to ${input.mappedRequestStatus} for requestId=${input.requestId}; current status is ${input.request.status}`,
+		);
+	}
+
 	private isOfflineTimeoutEligibleStatus(
 		status: RequestStatus | string,
 	): boolean {
@@ -1025,6 +1117,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	private mapToRobotStatus(state: string): RobotStatus | null {
+		const normalizedState = this.normalizeTelemetryState(state);
 		const statusMap: RobotStatus[] = [
 			RobotStatus.IDLE,
 			RobotStatus.ASSIGNED,
@@ -1037,14 +1130,17 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			RobotStatus.ERROR,
 			RobotStatus.MAINTENANCE,
 		];
-		return statusMap.includes(state as RobotStatus)
-			? (state as RobotStatus)
+		return statusMap.includes(normalizedState as RobotStatus)
+			? (normalizedState as RobotStatus)
 			: null;
 	}
 
 	private mapToRequestStatus(state: string): RequestStatus | null {
-		switch (state) {
+		const normalizedState = this.normalizeTelemetryState(state);
+		switch (normalizedState) {
 			case RequestStatus.NAVIGATING_TO_SHELF:
+				return RequestStatus.NAVIGATING_TO_SHELF;
+			case RobotStatus.NAVIGATING:
 				return RequestStatus.NAVIGATING_TO_SHELF;
 			case RequestStatus.ARRIVED_AT_SHELF:
 				return RequestStatus.ARRIVED_AT_SHELF;
@@ -1062,9 +1158,22 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				return RequestStatus.ARRIVED_AT_STUDENT;
 			case RequestStatus.READY:
 				return RequestStatus.READY;
+			case 'COMPLETED':
+			case 'FINISHED':
+			case 'DELIVERY_COMPLETED':
+			case 'DELIVERY_COMPLETE':
+			case 'TASK_COMPLETED':
+			case 'TASK_COMPLETE':
+			case 'MISSION_COMPLETED':
+			case 'MISSION_COMPLETE':
+				return RequestStatus.READY;
 			default:
 				return null;
 		}
+	}
+
+	private normalizeTelemetryState(state: string): string {
+		return state?.trim?.().toUpperCase().replace(/[\s-]+/g, '_') ?? '';
 	}
 
 	private buildTimelineItem(
