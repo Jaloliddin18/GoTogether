@@ -256,3 +256,50 @@ If a bad commit was made and not pushed, suggest:
 
 ### Key rule
 - When frontend admin dashboards add ranked book widgets, ensure the requested sort field is included in backend `availableBookSorts`; otherwise GraphQL validation returns `Bad Request Exception` before the service runs.
+
+---
+
+## Session Update (2026-05-25) — LostItem Phase 1 backend foundation
+
+### Completed
+- Added LostItem enum layer with GraphQL registration:
+  - `apps/nestar-api/src/libs/enums/lost-item.enum.ts`
+  - `LostItemObjectType`: `ID_CARD`, `BOTTLE`, `WALLET`, `PHONE`, `BOOK`, `UNKNOWN`
+  - `LostItemPriority`: `HIGH`, `MEDIUM`, `LOW`
+  - `LostItemStatus`: `PENDING_REVIEW`, `COLLECTED`, `DISMISSED`
+- Added LostItem schema:
+  - `apps/nestar-api/src/schemas/LostItem.model.ts`
+  - required fields: `robotId`, `eventType`, `objectType`, `confidence`, `priority`, `detectedAt`
+  - optional fields: `snapshotPath`, `snapshotUrl`, `location.*`, `notes`
+  - default status: `PENDING_REVIEW`
+  - indexes:
+    - `{ detectedAt: -1 }`
+    - `{ status: 1, detectedAt: -1 }`
+    - `{ robotId: 1, detectedAt: -1 }`
+    - `{ objectType: 1, priority: 1, detectedAt: -1 }`
+- Added LostItem DTO and input/update contracts:
+  - `apps/nestar-api/src/libs/dto/lost-item/lost-item.ts`
+  - `apps/nestar-api/src/libs/dto/lost-item/lost-item.input.ts`
+  - `apps/nestar-api/src/libs/dto/lost-item/lost-item.update.ts`
+- Added LostItem component module/resolver/service:
+  - `apps/nestar-api/src/components/lost-item/lost-item.module.ts`
+  - `apps/nestar-api/src/components/lost-item/lost-item.resolver.ts`
+  - `apps/nestar-api/src/components/lost-item/lost-item.service.ts`
+- Registered `LostItemModule` in `apps/nestar-api/src/components/components.module.ts`.
+- Added LostItem sort whitelist in `apps/nestar-api/src/libs/config.ts`:
+  - `availableLostItemSorts` with default use on `detectedAt DESC`.
+
+### API Added (admin-only)
+- Query: `getLostItems(input: LostItemsInquiry!): LostItems`
+- Mutation: `updateLostItemStatus(input: UpdateLostItemStatusInput!): LostItem`
+- Guard pattern: `@Roles(MemberType.ADMIN)` + `@UseGuards(RolesGuard)`
+
+### Explicitly Not Done In Phase 1
+- No MQTT lost-item listener/subscription.
+- No image upload endpoint for robot snapshots.
+- No frontend changes.
+- No Python vision module changes.
+- No request/delivery flow logic changes.
+
+### Verification
+- `npm run build` passed.

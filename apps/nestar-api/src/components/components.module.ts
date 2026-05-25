@@ -12,6 +12,7 @@ import { RequestModule } from './request/request.module';
 import { TwitModule } from './twit/twit.module';
 import { TwitCommentModule } from './twit-comment/twit-comment.module';
 import { ChatModule } from './chat/chat.module';
+import { LostItemModule } from './lost-item/lost-item.module';
 
 @Module({
 	imports: [
@@ -28,6 +29,7 @@ import { ChatModule } from './chat/chat.module';
 		TwitModule,
 		TwitCommentModule,
 		ChatModule,
+		LostItemModule,
 	],
 })
 export class ComponentsModule {}

@@ -113,3 +113,28 @@ RequestStatus:
 - Listener mode must subscribe to `robot/<robotId>/command` and execute robot movement from backend commands (`DELIVERY_TASK`, `RETURN_TO_DOCK`) without per-request manual trigger.
 - Keep status payload key as `state` and continue continuous pose publishing to `robot/<robotId>/pose`.
 - Ignore overlapping commands while a simulation is already running for safe demo behavior.
+
+---
+
+## Session Update (2026-05-25) — LostItem Phase 1 module baseline
+
+- Added new smart-library module: `src/components/lost-item/`
+  - `lost-item.module.ts`
+  - `lost-item.resolver.ts`
+  - `lost-item.service.ts`
+- Added new schema: `src/schemas/LostItem.model.ts` with required patrol-detection fields, default `PENDING_REVIEW`, and query indexes.
+- Added GraphQL contracts under `src/libs/dto/lost-item/`:
+  - output: `LostItem`, `LostItems`
+  - input: `LostItemsInquiry` (+ filters/status/objectType/priority/robotId/date-range/pagination)
+  - update: `UpdateLostItemStatusInput`
+- Added enums in `src/libs/enums/lost-item.enum.ts` and registered them for GraphQL.
+- Added admin GraphQL operations:
+  - `getLostItems(input)`
+  - `updateLostItemStatus(input)`
+- Added sort whitelist in `src/libs/config.ts`: `availableLostItemSorts`.
+- Registered `LostItemModule` inside `src/components/components.module.ts`.
+
+Operational boundary for this phase:
+- Do not add MQTT lost-item subscription in this step.
+- Do not add robot snapshot upload endpoint in this step.
+- Keep request/robot delivery runtime flow unchanged.

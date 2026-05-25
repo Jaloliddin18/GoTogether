@@ -142,8 +142,40 @@
   - checks all member counter fields for malformed/non-numeric values
   - logs pass/warn summary and samples (max 10) without changing DB data
 
+### 3.7 LostItem Phase 1 foundation (2026-05-25)
+- Added LostItem enums and GraphQL registration:
+  - `apps/nestar-api/src/libs/enums/lost-item.enum.ts`
+  - `LostItemObjectType`, `LostItemPriority`, `LostItemStatus`, `LostItemEventType`
+- Added LostItem schema:
+  - `apps/nestar-api/src/schemas/LostItem.model.ts`
+  - fields:
+    - required: `robotId`, `eventType`, `objectType`, `confidence`, `priority`, `detectedAt`
+    - optional: `snapshotPath`, `snapshotUrl`, `location.source`, `location.floorId`, `location.x`, `location.y`, `location.patrolCheckpoint`, `notes`
+    - `status` default: `PENDING_REVIEW`
+  - indexes:
+    - `detectedAt` desc
+    - `status + detectedAt` desc
+    - `robotId + detectedAt` desc
+    - `objectType + priority + detectedAt` desc
+- Added LostItem DTO/input/update contracts:
+  - `apps/nestar-api/src/libs/dto/lost-item/lost-item.ts`
+  - `apps/nestar-api/src/libs/dto/lost-item/lost-item.input.ts`
+  - `apps/nestar-api/src/libs/dto/lost-item/lost-item.update.ts`
+- Added LostItem component layer:
+  - `apps/nestar-api/src/components/lost-item/lost-item.module.ts`
+  - `apps/nestar-api/src/components/lost-item/lost-item.resolver.ts`
+  - `apps/nestar-api/src/components/lost-item/lost-item.service.ts`
+- Registered `LostItemModule` in `apps/nestar-api/src/components/components.module.ts`.
+- Added `availableLostItemSorts` in `apps/nestar-api/src/libs/config.ts`.
+- Added admin GraphQL API:
+  - `getLostItems(input: LostItemsInquiry!): LostItems`
+  - supports filters: `status`, `objectType`, `priority`, `robotId`, `detectedAtFrom`, `detectedAtTo`, pagination
+  - default sort: `detectedAt DESC`
+- Added admin GraphQL mutation:
+  - `updateLostItemStatus(input: UpdateLostItemStatusInput!): LostItem`
+
 ## 4. Build verification
-- `npm run build` passes after Phase 4/5/6 implementation and follow-up fixes.
+- `npm run build` passes after Phase 4/5/6 implementation, follow-up fixes, and LostItem Phase 1.
 
 ## 5. Completed runtime tests (confirmed)
 - Local MQTT broker connection works.
@@ -189,9 +221,13 @@
 ## 7. Next project steps
 1. Finish remaining runtime tests:
 - WebSocket client `joinRequest` + event reception
-2. Move to Phase 7:
-- staff/admin dashboard operations
-3. Later:
+2. Move to LostItem Phase 2:
+- add MQTT topic listener for `robot/{robotId}/lost-item` and persist events to `lostItems`.
+3. Move to LostItem Phase 3:
+- add snapshot upload API path for robot/vision module.
+4. Move to Phase 7:
+- staff/admin dashboard operations (include lost-item morning review list/actions).
+5. Later:
 - richer demo data
 - frontend book list/detail
 - borrow/purchase buttons

@@ -1,10 +1,50 @@
 # 같이Go Backend — Session Memory
 
 ## Last Updated
-2026-05-24
+2026-05-25
 
 ## Current Branch
 develop
+
+## Session Update (2026-05-25, LostItem Phase 1 backend foundation)
+
+### Completed
+- Added lost-item enum set with GraphQL registration:
+  - `apps/nestar-api/src/libs/enums/lost-item.enum.ts`
+  - `LostItemObjectType`, `LostItemPriority`, `LostItemStatus`, `LostItemEventType`
+- Added lost-item schema:
+  - `apps/nestar-api/src/schemas/LostItem.model.ts`
+  - fields: `robotId`, `eventType`, `objectType`, `confidence`, `priority`, `detectedAt`, `snapshotPath`, `snapshotUrl`, `location.*`, `status`, `notes`
+  - default status: `PENDING_REVIEW`
+  - indexes:
+    - `{ detectedAt: -1 }`
+    - `{ status: 1, detectedAt: -1 }`
+    - `{ robotId: 1, detectedAt: -1 }`
+    - `{ objectType: 1, priority: 1, detectedAt: -1 }`
+- Added DTOs and inputs:
+  - `apps/nestar-api/src/libs/dto/lost-item/lost-item.ts`
+  - `apps/nestar-api/src/libs/dto/lost-item/lost-item.input.ts`
+  - `apps/nestar-api/src/libs/dto/lost-item/lost-item.update.ts`
+- Added component module:
+  - `apps/nestar-api/src/components/lost-item/lost-item.module.ts`
+  - `apps/nestar-api/src/components/lost-item/lost-item.resolver.ts`
+  - `apps/nestar-api/src/components/lost-item/lost-item.service.ts`
+- Added config sort whitelist:
+  - `apps/nestar-api/src/libs/config.ts` → `availableLostItemSorts`
+- Registered module:
+  - `apps/nestar-api/src/components/components.module.ts` includes `LostItemModule`
+- New admin APIs:
+  - query `getLostItems(input: LostItemsInquiry!): LostItems`
+  - mutation `updateLostItemStatus(input: UpdateLostItemStatusInput!): LostItem`
+
+### Explicitly deferred in this phase
+- No MQTT lost-item topic subscription.
+- No robot snapshot upload mutation/endpoint.
+- No frontend integration.
+- No Python vision module integration.
+
+### Verification
+- `npm run build` passed after Phase 1 implementation.
 
 ## Session Update (2026-05-24, memberBooks admin-only policy)
 

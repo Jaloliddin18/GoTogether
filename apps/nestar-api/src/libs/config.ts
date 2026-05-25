@@ -59,6 +59,17 @@ export const availableRequestSorts = [
 	'paymentStatus',
 ];
 
+export const availableLostItemSorts = [
+	'detectedAt',
+	'createdAt',
+	'updatedAt',
+	'robotId',
+	'objectType',
+	'priority',
+	'status',
+	'confidence',
+];
+
 export const REQUEST_RECEPTION_DESTINATION = {
 	floorId: 'demo_floor',
 	x: 0.5,

@@ -117,3 +117,19 @@ When removing old real-estate code later, Codex must:
 - Ask for confirmation
 - Run build after deletion
 - Never delete large folders without confirmation
+
+---
+
+## Session Note (2026-05-25) — LostItem Phase 1 workflow boundary
+
+For night patrol lost-item backend work, keep implementation split into safe phases:
+1. Phase 1: schema/enums/dto/service/resolver/module registration + admin query/status update only.
+2. Phase 2: MQTT subscription and persistence flow.
+3. Phase 3: snapshot upload API path.
+4. Later: frontend/admin review UI.
+
+Phase 1 guardrails:
+- Do not change existing request/delivery status logic.
+- Do not modify MQTT runtime service in Phase 1.
+- Do not modify upload behavior in Phase 1.
+- Always run `npm run build` after Phase 1 backend changes.

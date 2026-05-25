@@ -217,3 +217,27 @@ JWT_SECRET=
   - `BOOK_NOT_FOUND` and offline timeout paths fail request safely and release robot/inventory
   - request-scoped WebSocket emits for status/pose/ready/failure events
   - READY keeps request at READY, clears timeout, releases robot, and avoids duplicate timeline entries
+
+---
+
+## Session Update (2026-05-25) — LostItem Phase 1 backend support
+
+### Completed
+- Added LostItem backend foundation as a new module:
+  - `apps/nestar-api/src/components/lost-item/*`
+  - `apps/nestar-api/src/schemas/LostItem.model.ts`
+  - `apps/nestar-api/src/libs/dto/lost-item/*`
+  - `apps/nestar-api/src/libs/enums/lost-item.enum.ts`
+- Registered `LostItemModule` in `ComponentsModule`.
+- Added `availableLostItemSorts` in `apps/nestar-api/src/libs/config.ts`.
+- Added admin GraphQL APIs:
+  - `getLostItems(input: LostItemsInquiry!): LostItems`
+  - `updateLostItemStatus(input: UpdateLostItemStatusInput!): LostItem`
+
+### Explicitly deferred
+- No MQTT lost-item listener in this phase.
+- No robot snapshot upload endpoint in this phase.
+- No frontend changes in this phase.
+
+### Verification
+- `npm run build` passed after implementation.
