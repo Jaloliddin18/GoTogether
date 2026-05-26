@@ -370,6 +370,13 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				if (updatedRequest) {
 					currentRequest = updatedRequest;
 					requestStatusChanged = true;
+					this.logRequestStateChange({
+						requestId,
+						fromStatus: activeRequest.status,
+						toStatus: updatedRequest.status,
+						source: `mqtt-status:${payload.state}`,
+						message: payload.message,
+					});
 					this.emitToRequestRoom(requestId, 'requestUpdated', {
 						requestId,
 						status: mappedRequestStatus,
@@ -436,6 +443,13 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				this.clearOfflineTimeout(payloadRobotId);
 
 				if (failedRequest) {
+					this.logRequestStateChange({
+						requestId,
+						fromStatus: currentRequest.status,
+						toStatus: failedRequest.status,
+						source: 'mqtt-status:BOOK_NOT_FOUND',
+						message: payload.message || 'Book not found.',
+					});
 					this.emitToRequestRoom(requestId, 'requestUpdated', {
 						requestId,
 						status: RequestStatus.FAILED,
@@ -860,6 +874,13 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 					{ new: true },
 				)
 				.exec();
+			this.logRequestStateChange({
+				requestId,
+				fromStatus: request.status,
+				toStatus: RequestStatus.FAILED,
+				source: 'offline-timeout',
+				message: 'Robot connection lost.',
+			});
 
 			await this.releaseInventoryReservation(request.sourceInventoryId);
 
@@ -956,20 +977,22 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 						return requestFromPayload;
 					}
 
-				const completedRequestFromPayload = await this.requestModel
+				const terminalRequestFromPayload = await this.requestModel
 					.findOne({
 						_id: shapeIntoMongoObjectId(payloadRequestId),
 						robotId: input.robot._id,
-						status: RequestStatus.COMPLETED,
+						status: {
+							$in: [RequestStatus.COMPLETED, RequestStatus.CANCELLED],
+						},
 					})
 					.exec();
 					if (
-						completedRequestFromPayload &&
+						terminalRequestFromPayload &&
 						this.isWithinPostCompletionTelemetryWindow(
-							completedRequestFromPayload.updatedAt,
+							terminalRequestFromPayload.updatedAt,
 						)
 					) {
-						return completedRequestFromPayload;
+						return terminalRequestFromPayload;
 					}
 			} catch {
 				this.logger.warn(
@@ -1195,6 +1218,27 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			return new Date();
 		}
 		return parsed;
+	}
+
+	private logRequestStateChange(input: {
+		requestId: ObjectId | string;
+		fromStatus: RequestStatus | string | null | undefined;
+		toStatus: RequestStatus | string | null | undefined;
+		source: string;
+		message?: string | null;
+	}): void {
+		const fromStatus = input.fromStatus ?? 'NONE';
+		const toStatus = input.toStatus ?? 'UNKNOWN';
+		if (fromStatus === toStatus) return;
+
+		const message = input.message?.trim();
+		const messageSuffix = message ? ` message="${message}"` : '';
+
+		this.logger.log(
+			`REQUEST_STATE_CHANGE requestId=${String(
+				input.requestId,
+			)} from=${fromStatus} to=${toStatus} source=${input.source}${messageSuffix}`,
+		);
 	}
 
 	private async releaseRobot(robotObjectId: ObjectId): Promise<void> {

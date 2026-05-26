@@ -191,6 +191,13 @@ export class RequestService {
 
 			const created: RequestTask = await this.requestModel.create(payload);
 			createdRequestId = created._id;
+			this.logRequestStateChange({
+				requestId: created._id,
+				fromStatus: null,
+				toStatus: created.status,
+				source: 'createDeliveryRequest',
+				message: 'Request created.',
+			});
 
 			if (robot) {
 				await this.robotModel
@@ -393,6 +400,13 @@ export class RequestService {
 			)
 			.exec();
 		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
+		this.logRequestStateChange({
+			requestId: result._id,
+			fromStatus: target.status,
+			toStatus: result.status,
+			source: 'updateRequestStatus',
+			message: input.message,
+		});
 
 		this.emitRequestUpdatedPayload(result);
 
@@ -404,13 +418,27 @@ export class RequestService {
 				RequestStatus.CANCELLED,
 			].includes(input.status)
 		) {
-			const releasedRobot = await this.releaseRobot(target.robotId);
-			if (releasedRobot) {
-				const nextAssignedRequest = await this.tryAssignNextQueuedRequest(releasedRobot);
-				if (nextAssignedRequest) {
-					this.emitRequestUpdatedPayload(nextAssignedRequest);
-				} else if (input.status === RequestStatus.COMPLETED) {
-					await this.startRobotReturnToDock(releasedRobot, result._id);
+			const robot = await this.robotModel.findOne({ _id: target.robotId }).exec();
+			if (robot) {
+				if (input.status === RequestStatus.CANCELLED) {
+					const nextAssignedRequest =
+						await this.tryAssignNextQueuedRequestForSameOwner(robot, target);
+					if (nextAssignedRequest) {
+						this.emitRequestUpdatedPayload(nextAssignedRequest);
+					} else {
+						await this.startRobotReturnToDock(robot, result._id);
+					}
+				} else {
+					const releasedRobot = await this.releaseRobot(target.robotId);
+					if (releasedRobot) {
+						const nextAssignedRequest =
+							await this.tryAssignNextQueuedRequest(releasedRobot);
+						if (nextAssignedRequest) {
+							this.emitRequestUpdatedPayload(nextAssignedRequest);
+						} else if (input.status === RequestStatus.COMPLETED) {
+							await this.startRobotReturnToDock(releasedRobot, result._id);
+						}
+					}
 				}
 			}
 		}
@@ -473,21 +501,36 @@ export class RequestService {
 			)
 			.exec();
 		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
+		this.logRequestStateChange({
+			requestId: result._id,
+			fromStatus: target.status,
+			toStatus: result.status,
+			source: 'cancelRequest',
+			message: input.reason ?? 'Request cancelled.',
+		});
 
 		await this.releaseInventoryReservation(target.sourceInventoryId);
 
 		if (target.robotId) {
 			const robot = await this.robotModel
 				.findOne({ _id: target.robotId })
-				.lean()
 				.exec();
-			await this.releaseRobot(target.robotId);
 			if (robot?.robotId) {
 				const cancelPayload: MqttCancelCommandPayload = {
 					type: 'CANCEL_TASK',
 					requestId: String(target._id),
 				};
 				this.mqttRobotService.publishCommand(robot.robotId, cancelPayload);
+
+				const nextAssignedRequest =
+					await this.tryAssignNextQueuedRequestForSameOwner(robot, target);
+				if (nextAssignedRequest) {
+					this.emitRequestUpdatedPayload(nextAssignedRequest);
+				} else {
+					await this.startRobotReturnToDock(robot, result._id);
+				}
+			} else {
+				await this.releaseRobot(target.robotId);
 			}
 		}
 
@@ -681,6 +724,27 @@ export class RequestService {
 			message: message ?? '',
 			timestamp: new Date(),
 		};
+	}
+
+	private logRequestStateChange(input: {
+		requestId: ObjectId | string;
+		fromStatus: RequestStatus | string | null | undefined;
+		toStatus: RequestStatus | string | null | undefined;
+		source: string;
+		message?: string | null;
+	}): void {
+		const fromStatus = input.fromStatus ?? 'NONE';
+		const toStatus = input.toStatus ?? 'UNKNOWN';
+		if (fromStatus === toStatus) return;
+
+		const message = input.message?.trim();
+		const messageSuffix = message ? ` message="${message}"` : '';
+
+		this.logger.log(
+			`REQUEST_STATE_CHANGE requestId=${String(
+				input.requestId,
+			)} from=${fromStatus} to=${toStatus} source=${input.source}${messageSuffix}`,
+		);
 	}
 
 	private hasTimelineStatus(
@@ -904,6 +968,76 @@ export class RequestService {
 		if (!nextQueuedRequest) {
 			return null;
 		}
+		return await this.finalizeQueuedAssignment(
+			robot,
+			nextQueuedRequest,
+			'tryAssignNextQueuedRequest',
+			'Robot assigned for queued request.',
+		);
+	}
+
+	private async tryAssignNextQueuedRequestForSameOwner(
+		robot: Robot,
+		ownerRequest: RequestTask,
+	): Promise<RequestTask | null> {
+		const ownerFilter: T = {};
+		if (ownerRequest.memberId) {
+			ownerFilter.memberId = ownerRequest.memberId;
+		} else if (ownerRequest.sessionId) {
+			ownerFilter.sessionId = ownerRequest.sessionId;
+		} else {
+			return null;
+		}
+
+		const nextQueuedRequest = await this.requestModel
+			.findOneAndUpdate(
+				{
+					status: RequestStatus.QUEUED,
+					$or: [{ robotId: null }, { robotId: { $exists: false } }],
+					...ownerFilter,
+				},
+				{
+					$set: {
+						status: RequestStatus.ASSIGNED,
+						robotId: robot._id,
+					},
+					$push: {
+						timeline: this.buildTimelineItem(
+							RequestStatus.ASSIGNED,
+							'Robot assigned for delivery request.',
+						),
+					},
+				},
+				{ new: true },
+			)
+			.sort({ createdAt: 1 })
+			.exec();
+
+		if (!nextQueuedRequest) {
+			return null;
+		}
+
+		return await this.finalizeQueuedAssignment(
+			robot,
+			nextQueuedRequest,
+			'tryAssignNextQueuedRequestForSameOwner',
+			'Robot assigned for same owner queued request.',
+		);
+	}
+
+	private async finalizeQueuedAssignment(
+		robot: Robot,
+		nextQueuedRequest: RequestTask,
+		source: string,
+		logMessage: string,
+	): Promise<RequestTask> {
+		this.logRequestStateChange({
+			requestId: nextQueuedRequest._id,
+			fromStatus: RequestStatus.QUEUED,
+			toStatus: nextQueuedRequest.status,
+			source,
+			message: logMessage,
+		});
 
 		await this.robotModel
 			.findOneAndUpdate(
