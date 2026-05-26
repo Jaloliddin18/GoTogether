@@ -289,6 +289,7 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				lastSeenAt: new Date(),
 				isOnline: true,
 			};
+			const normalizedTelemetryState = this.normalizeTelemetryState(payload.state);
 			const mappedRequestStatus = this.mapToRequestStatus(payload.state);
 
 			if (typeof payload.battery === 'number') {
@@ -296,13 +297,28 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			}
 
 			const mappedRobotStatus = this.mapToRobotStatus(payload.state);
-			if (mappedRobotStatus) {
+			const shouldFinalizeReturnToDock =
+				this.isDockCompletionTelemetryState(normalizedTelemetryState) &&
+				(robot.status === RobotStatus.RETURNING ||
+					robot.status === RobotStatus.DOCKING);
+
+			if (shouldFinalizeReturnToDock) {
+				robotUpdate.status = RobotStatus.IDLE;
+				robotUpdate.currentRequestId = null;
+				this.logger.log(
+					`Robot ${payloadRobotId} reached dock completion state=${normalizedTelemetryState}; status set to IDLE`,
+				);
+			} else if (mappedRobotStatus) {
 				robotUpdate.status = mappedRobotStatus;
 			} else if (!mappedRequestStatus) {
 				this.logger.warn(
 					`Unknown telemetry state=${payload.state}; updating battery/online only for robotId=${payloadRobotId}`,
 				);
 			}
+
+			const robotStatusForEmit =
+				(robotUpdate.status as string | undefined) ??
+				(mappedRobotStatus ?? payload.state);
 
 			await this.robotModel
 				.findOneAndUpdate({ _id: robot._id }, { $set: robotUpdate }, { new: true })
@@ -403,14 +419,14 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				}
 			}
 
-			this.emitToRequestRoom(requestId, 'robotStatus', {
-				robotId: payloadRobotId,
-				requestId,
-				status: mappedRobotStatus ?? payload.state,
-				message: payload.message,
-				battery: payload.battery,
-				timestamp: payload.timestamp,
-			});
+				this.emitToRequestRoom(requestId, 'robotStatus', {
+					robotId: payloadRobotId,
+					requestId,
+					status: robotStatusForEmit,
+					message: payload.message,
+					battery: payload.battery,
+					timestamp: payload.timestamp,
+				});
 
 			if (this.isTerminalRequestStatus(payload.state)) {
 				this.clearOfflineTimeout(payloadRobotId);
@@ -1137,6 +1153,19 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		return (
 			status !== RequestStatus.READY && !this.isTerminalRequestStatus(status)
 		);
+	}
+
+	private isDockCompletionTelemetryState(normalizedState: string): boolean {
+		return [
+			'COMPLETED',
+			'FINISHED',
+			'DELIVERY_COMPLETED',
+			'DELIVERY_COMPLETE',
+			'TASK_COMPLETED',
+			'TASK_COMPLETE',
+			'MISSION_COMPLETED',
+			'MISSION_COMPLETE',
+		].includes(normalizedState);
 	}
 
 	private mapToRobotStatus(state: string): RobotStatus | null {

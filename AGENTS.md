@@ -188,6 +188,25 @@ If a bad commit was made and not pushed, suggest:
 
 ---
 
+## Session Update (2026-05-27) — Dock completion telemetry now finalizes robot status
+
+### Completed
+- Fixed post-delivery robot status finalization in:
+  - `apps/nestar-api/src/robot-comm/mqtt.service.ts`
+- In MQTT status handling, completion-style telemetry states now finalize return lifecycle:
+  - completion aliases handled: `COMPLETED`, `FINISHED`, `DELIVERY_COMPLETED`, `DELIVERY_COMPLETE`, `TASK_COMPLETED`, `TASK_COMPLETE`, `MISSION_COMPLETED`, `MISSION_COMPLETE`
+  - if robot is currently `RETURNING` or `DOCKING`, backend now sets robot status to `IDLE` and clears `currentRequestId`.
+- Kept request terminal guardrails unchanged:
+  - terminal request statuses remain protected from non-terminal rollback
+  - robot finalization is handled independently from request-state downgrade logic.
+- Updated emitted `robotStatus` payload to reflect finalized status when this dock completion path is triggered.
+
+### Verification
+- `npm run build` passed after the MQTT status finalization fix.
+
+### Operational rule from this session
+- Treat dock-completion telemetry as a robot-lifecycle finalization signal; when robot is returning/docking, completion aliases must transition robot to `IDLE` in DB.
+
 ## Session Update (2026-05-24) — memberBooks admin-only persistence policy
 
 ### Completed

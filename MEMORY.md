@@ -1,10 +1,39 @@
 # 같이Go Backend — Session Memory
 
 ## Last Updated
-2026-05-26
+2026-05-27
 
 ## Current Branch
 develop
+
+## Session Update (2026-05-27, dock completion telemetry finalization for robot status)
+
+### Completed
+- Fixed robot status getting stuck at `RETURNING` after dock return completion.
+- Updated MQTT status handling in `apps/nestar-api/src/robot-comm/mqtt.service.ts`:
+  - detects completion-style telemetry states:
+    - `COMPLETED`, `FINISHED`, `DELIVERY_COMPLETED`, `DELIVERY_COMPLETE`, `TASK_COMPLETED`, `TASK_COMPLETE`, `MISSION_COMPLETED`, `MISSION_COMPLETE`
+  - when current robot status is `RETURNING` or `DOCKING`, backend now:
+    - sets robot status to `IDLE`
+    - clears `currentRequestId`
+    - logs explicit dock-completion finalization.
+- Kept existing request terminal-state protections unchanged:
+  - request status downgrade guard remains active
+  - robot lifecycle finalization is now explicitly handled even when request is already terminal.
+- `robotStatus` room emission now uses the finalized status for this path.
+
+### Verification
+- Backend build passed with `npm run build`.
+
+### Current stopping point
+- Robot DB status should no longer remain `RETURNING` after post-completion return-to-dock cycle reports completion telemetry.
+
+### Exact next task
+- Runtime verify with one full delivery:
+  1. `READY -> COMPLETED` (pickup confirm)
+  2. backend sends `RETURN_TO_DOCK`
+  3. robot publishes completion alias
+  4. robot document ends in `IDLE` with `currentRequestId: null`.
 
 ## Session Update (2026-05-26, LostItem Phase 3 snapshot upload API)
 
