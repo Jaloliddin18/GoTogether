@@ -12,6 +12,7 @@ export enum LostItemObjectType {
 	WALLET = 'WALLET',
 	PHONE = 'PHONE',
 	BOOK = 'BOOK',
+	AIRPODS = 'AIRPODS',
 	UNKNOWN = 'UNKNOWN',
 }
 
