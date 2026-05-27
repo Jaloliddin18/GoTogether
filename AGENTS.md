@@ -231,6 +231,41 @@ If a bad commit was made and not pushed, suggest:
 
 ### Verification
 - `npm run build` passed.
+
+---
+
+## Session Update (2026-05-28) — LostItem multi-class YOLO label compatibility
+
+### Completed
+- Updated LostItem MQTT object-type normalization in:
+  - `apps/nestar-api/src/robot-comm/mqtt.service.ts`
+- Added/confirmed compatibility mappings for new model labels:
+  - `watch` / `WATCH` -> `WATCH`
+  - `airpods` / `AIRPODS` -> `AIRPODS`
+  - `airpod` -> `AIRPODS`
+  - `airpods_case` -> `AIRPODS`
+- Kept existing mappings intact:
+  - `id_card` -> `ID_CARD`
+  - `phone` -> `PHONE`
+  - `wallet` -> `WALLET`
+  - `bottle` -> `BOTTLE`
+- Updated priority fallback defaults in MQTT normalization:
+  - `ID_CARD`, `PHONE`, `WALLET` -> `HIGH`
+  - `WATCH`, `AIRPODS`, `BOOK` -> `MEDIUM`
+  - `BOTTLE`, `UNKNOWN` -> `LOW`
+- Enum compatibility confirmed:
+  - `LostItemObjectType` already includes `WATCH` and `AIRPODS` and remains GraphQL-registered.
+
+### Explicitly preserved
+- No LostItem schema field changes.
+- No new APIs.
+- No changes to `uploadLostItemSnapshot`.
+- No behavior changes to `getLostItems` / `updateLostItemStatus` beyond enum/object-type compatibility.
+- No frontend or Python vision module changes.
+- No request/delivery flow changes outside lost-item normalization.
+
+### Verification
+- `npm run build` passed after the normalization/priority update.
 - `npm run backfill:member-counters` executed with:
   - `member counter backfill done (general counters): matched=9, modified=0`
   - `memberBooks admin-only normalize done: matched=2, modified=0`

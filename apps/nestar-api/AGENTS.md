@@ -212,3 +212,31 @@ Operational boundary for this phase:
   - no LostItem module/runtime changes.
 - Verification:
   - `npm run build` passed.
+
+---
+
+## Session Update (2026-05-28) — LostItem YOLO multi-class normalization update
+
+- Updated `src/robot-comm/mqtt.service.ts` lost-item normalization for new detection labels.
+- Object type mapping now explicitly supports:
+  - `watch`/`WATCH` -> `WATCH`
+  - `airpods`/`AIRPODS` -> `AIRPODS`
+  - `airpod` -> `AIRPODS`
+  - `airpods_case` -> `AIRPODS`
+- Existing mappings preserved (`id_card`, `phone`, `wallet`, `bottle`).
+- Priority fallback defaults are now:
+  - `ID_CARD`, `PHONE`, `WALLET` => `HIGH`
+  - `WATCH`, `AIRPODS`, `BOOK` => `MEDIUM`
+  - `BOTTLE`, `UNKNOWN` => `LOW`
+- Enum compatibility confirmed:
+  - `src/libs/enums/lost-item.enum.ts` already contains `WATCH` and `AIRPODS`
+  - GraphQL enum registration remains unchanged.
+
+Operational boundary for this update:
+- No schema changes.
+- No new GraphQL operations.
+- No upload flow changes.
+- No frontend/Python/request-flow changes outside lost-item normalization.
+
+Verification:
+- `npm run build` passed.

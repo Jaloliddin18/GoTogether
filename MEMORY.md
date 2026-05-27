@@ -1,10 +1,45 @@
 # 같이Go Backend — Session Memory
 
 ## Last Updated
-2026-05-27
+2026-05-28
 
 ## Current Branch
 develop
+
+## Session Update (2026-05-28, LostItem multi-class YOLO model compatibility)
+
+### Completed
+- Updated lost-item MQTT normalization in `apps/nestar-api/src/robot-comm/mqtt.service.ts` for new model labels.
+- Added/confirmed objectType normalization:
+  - `watch` / `WATCH` -> `WATCH`
+  - `airpods` / `AIRPODS` -> `AIRPODS`
+  - `airpod` -> `AIRPODS`
+  - `airpods_case` -> `AIRPODS`
+- Existing mappings preserved:
+  - `id_card` -> `ID_CARD`
+  - `phone` -> `PHONE`
+  - `wallet` -> `WALLET`
+  - `bottle` -> `BOTTLE`
+- Updated priority fallback mapping:
+  - `ID_CARD`, `PHONE`, `WALLET` -> `HIGH`
+  - `WATCH`, `AIRPODS`, `BOOK` -> `MEDIUM`
+  - `BOTTLE`, `UNKNOWN` -> `LOW`
+- Enum compatibility confirmed:
+  - `apps/nestar-api/src/libs/enums/lost-item.enum.ts` already includes `WATCH` and `AIRPODS` and remains registered for GraphQL.
+
+### Explicitly preserved
+- No LostItem schema field changes.
+- No API additions.
+- No upload mutation changes.
+- No frontend changes.
+- No Python vision module changes.
+- No request/delivery flow changes outside lost-item normalization.
+
+### Verification
+- Backend build passed with `npm run build`.
+
+### Current stopping point
+- Backend is compatible with the new multi-class lost-item model labels for `WATCH` and `AIRPODS` ingestion via MQTT.
 
 ## Session Update (2026-05-27, dock completion telemetry finalization for robot status)
 

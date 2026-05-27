@@ -676,6 +676,8 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 				return LostItemObjectType.BOOK;
 			case LostItemObjectType.AIRPODS:
 			case 'AIRPOD':
+			case 'AIRPOD_CASE':
+			case 'AIRPODS_CASE':
 			case 'EARBUDS':
 			case 'EARPHONES':
 				return LostItemObjectType.AIRPODS;
@@ -698,14 +700,16 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 		if (
 			objectType === LostItemObjectType.ID_CARD ||
 			objectType === LostItemObjectType.WALLET ||
-			objectType === LostItemObjectType.PHONE ||
-			objectType === LostItemObjectType.AIRPODS ||
-			objectType === LostItemObjectType.WATCH
+			objectType === LostItemObjectType.PHONE
 		) {
 			return LostItemPriority.HIGH;
 		}
 
-		if (objectType === LostItemObjectType.BOOK) {
+		if (
+			objectType === LostItemObjectType.BOOK ||
+			objectType === LostItemObjectType.AIRPODS ||
+			objectType === LostItemObjectType.WATCH
+		) {
 			return LostItemPriority.MEDIUM;
 		}
 
