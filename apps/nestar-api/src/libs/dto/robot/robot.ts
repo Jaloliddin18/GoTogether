@@ -1,4 +1,4 @@
-import { Field, Int, ObjectType } from '@nestjs/graphql';
+import { Field, Float, ObjectType } from '@nestjs/graphql';
 import type { ObjectId } from 'mongoose';
 import { RobotStatus } from '../../enums/robot.enum';
 import { TotalCounter } from '../member/member';
@@ -32,7 +32,7 @@ export class Robot {
 	@Field(() => RobotStatus)
 	status: RobotStatus;
 
-	@Field(() => Int)
+	@Field(() => Float)
 	battery: number;
 
 	@Field(() => Boolean)

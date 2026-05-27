@@ -1,4 +1,4 @@
-import { Field, InputType, Int } from '@nestjs/graphql';
+import { Field, Float, InputType } from '@nestjs/graphql';
 import {
 	IsBoolean,
 	IsNumber,
@@ -57,7 +57,7 @@ export class UpdateRobotInput {
 	@IsOptional()
 	@Min(0)
 	@Max(100)
-	@Field(() => Int, { nullable: true })
+	@Field(() => Float, { nullable: true })
 	battery?: number;
 
 	@IsOptional()

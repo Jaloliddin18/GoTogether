@@ -1,4 +1,4 @@
-import { Field, InputType, Int } from '@nestjs/graphql';
+import { Field, Float, InputType, Int } from '@nestjs/graphql';
 import {
 	IsBoolean,
 	IsIn,
@@ -56,7 +56,7 @@ export class CreateRobotInput {
 	@IsOptional()
 	@Min(0)
 	@Max(100)
-	@Field(() => Int, { nullable: true })
+	@Field(() => Float, { nullable: true })
 	battery?: number;
 
 	@IsOptional()
@@ -94,13 +94,13 @@ export class RobotSearchInput {
 	@IsOptional()
 	@Min(0)
 	@Max(100)
-	@Field(() => Int, { nullable: true })
+	@Field(() => Float, { nullable: true })
 	batteryMin?: number;
 
 	@IsOptional()
 	@Min(0)
 	@Max(100)
-	@Field(() => Int, { nullable: true })
+	@Field(() => Float, { nullable: true })
 	batteryMax?: number;
 }
 
