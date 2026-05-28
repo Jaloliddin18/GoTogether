@@ -240,3 +240,26 @@ Operational boundary for this update:
 
 Verification:
 - `npm run build` passed.
+
+---
+
+## Session Update (2026-05-28) — MQTT startup telemetry subscriptions for demo tracking
+
+- Updated `src/robot-comm/mqtt.service.ts` MQTT connect flow to subscribe at startup:
+  - `robot/+/status`
+  - `robot/+/pose`
+  - `robot/+/lost-item`
+- Added duplicate-subscription guard for topic filters:
+  - tracks subscribed and pending topic filters
+  - skips repeated subscribe calls for the same filter.
+- Kept per-robot subscribe flow (`subscribeToRobotTopics(robotId)`) as fallback:
+  - now safely no-ops when global telemetry wildcard subscriptions are already active.
+- Preserved runtime handling boundaries:
+  - no request-status mapping logic changes
+  - existing robot/request validation and malformed payload drop behavior unchanged.
+
+Operational note:
+- Demo/manual publish to `robot/robot_01/status` now works immediately after backend startup without needing prior request-driven per-robot subscription.
+
+Verification:
+- `npm run build` passed.

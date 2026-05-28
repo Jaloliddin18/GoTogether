@@ -32,8 +32,12 @@ import {
 export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger: Logger = new Logger(MqttRobotService.name);
 	private client: MqttClient | null = null;
+	private readonly statusTopic = 'robot/+/status';
+	private readonly poseTopic = 'robot/+/pose';
 	private readonly lostItemTopic = 'robot/+/lost-item';
 	private readonly subscribedRobotIds: Set<string> = new Set<string>();
+	private readonly subscribedTopicFilters: Set<string> = new Set<string>();
+	private readonly pendingTopicFilters: Set<string> = new Set<string>();
 	private readonly offlineTimeouts: Map<string, ReturnType<typeof setTimeout>> =
 		new Map<string, ReturnType<typeof setTimeout>>();
 	private readonly terminalRequestStatuses: RequestStatus[] = [
@@ -78,8 +82,9 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 
 		this.client.on('connect', () => {
 			this.logger.log(`MQTT connected successfully (${maskedBrokerUrl})`);
-			this.subscribeLostItemTopic();
-			this.resubscribeKnownRobotTopics();
+			this.subscribedTopicFilters.clear();
+			this.pendingTopicFilters.clear();
+			this.subscribeStartupTopics();
 		});
 
 		this.client.on('error', (error: Error) => {
@@ -114,6 +119,8 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 			this.logger.log('MQTT client disconnected gracefully');
 		});
 		this.client = null;
+		this.subscribedTopicFilters.clear();
+		this.pendingTopicFilters.clear();
 	}
 
 	publishCommand(
@@ -168,35 +175,96 @@ export class MqttRobotService implements OnModuleInit, OnModuleDestroy {
 
 	private subscribeRobotTopicsNow(robotId: string): void {
 		if (!this.client || !this.client.connected) return;
+		if (this.isGlobalTelemetryCovered()) {
+			this.logger.debug(
+				`Global MQTT telemetry topics already active; skipping per-robot subscribe for robotId=${robotId}`,
+			);
+			return;
+		}
 
 		const statusTopic: string = `robot/${robotId}/status`;
 		const poseTopic: string = `robot/${robotId}/pose`;
 
-		this.client.subscribe([statusTopic, poseTopic], (error?: Error) => {
-			if (error) {
-				this.logger.error(
-					`Failed MQTT subscribe for robotId=${robotId}: ${error.message}`,
-				);
-				return;
-			}
-			this.logger.log(
-				`Subscribed MQTT topics for robotId=${robotId}: ${statusTopic}, ${poseTopic}`,
-			);
-		});
+		this.subscribeTopicsOnce([statusTopic, poseTopic], `robotId=${robotId}`);
+	}
+
+	private subscribeStartupTopics(): void {
+		this.subscribeTopicsOnce(
+			[this.statusTopic, this.poseTopic],
+			'startup-telemetry',
+			() => {
+				this.resubscribeKnownRobotTopics();
+			},
+		);
+		this.subscribeLostItemTopic();
 	}
 
 	private subscribeLostItemTopic(): void {
-		if (!this.client || !this.client.connected) return;
+		this.subscribeTopicsOnce([this.lostItemTopic], 'lost-item');
+	}
 
-		this.client.subscribe(this.lostItemTopic, (error?: Error) => {
+	private subscribeTopicsOnce(
+		topics: string[],
+		context: string,
+		onComplete?: () => void,
+	): void {
+		if (!this.client || !this.client.connected) {
+			onComplete?.();
+			return;
+		}
+
+		const uniqueTopics = Array.from(
+			new Set(
+				topics
+					.map((topic) => topic?.trim())
+					.filter((topic): topic is string => Boolean(topic)),
+			),
+		);
+		const topicsToSubscribe = uniqueTopics.filter(
+			(topic) =>
+				!this.subscribedTopicFilters.has(topic) &&
+				!this.pendingTopicFilters.has(topic),
+		);
+
+		if (!topicsToSubscribe.length) {
+			this.logger.debug(
+				`MQTT subscribe skipped (${context}); all topics already subscribed`,
+			);
+			onComplete?.();
+			return;
+		}
+
+		for (const topic of topicsToSubscribe) {
+			this.pendingTopicFilters.add(topic);
+		}
+
+		this.client.subscribe(topicsToSubscribe, (error?: Error) => {
+			for (const topic of topicsToSubscribe) {
+				this.pendingTopicFilters.delete(topic);
+			}
+
 			if (error) {
 				this.logger.error(
-					`Failed MQTT subscribe for topic=${this.lostItemTopic}: ${error.message}`,
+					`Failed MQTT subscribe (${context}) topics=${topicsToSubscribe.join(', ')}: ${error.message}`,
 				);
+				onComplete?.();
 				return;
 			}
-			this.logger.log(`Subscribed MQTT topic: ${this.lostItemTopic}`);
+
+			for (const topic of topicsToSubscribe) {
+				this.subscribedTopicFilters.add(topic);
+				this.logger.log(`Subscribed MQTT topic: ${topic}`);
+			}
+			onComplete?.();
 		});
+	}
+
+	private isGlobalTelemetryCovered(): boolean {
+		const isTracked = (topic: string): boolean =>
+			this.subscribedTopicFilters.has(topic) ||
+			this.pendingTopicFilters.has(topic);
+
+		return isTracked(this.statusTopic) && isTracked(this.poseTopic);
 	}
 
 	private resubscribeKnownRobotTopics(): void {

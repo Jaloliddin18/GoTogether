@@ -6,6 +6,37 @@
 ## Current Branch
 develop
 
+## Session Update (2026-05-28, global MQTT status/pose startup subscription for delivery demo)
+
+### Root cause
+- Backend startup subscribed only `robot/+/lost-item`.
+- Delivery telemetry topics (`robot/{robotId}/status`, `robot/{robotId}/pose`) were available only through later per-robot subscription flow, so manual demo publish could be missed if that flow had not run yet.
+
+### Completed
+- Updated `apps/nestar-api/src/robot-comm/mqtt.service.ts` connect lifecycle:
+  - on MQTT connect, subscribe startup topics:
+    - `robot/+/status`
+    - `robot/+/pose`
+    - `robot/+/lost-item`
+- Added duplicate-subscription protection for topic filters:
+  - `subscribedTopicFilters` and `pendingTopicFilters`
+  - centralized `subscribeTopicsOnce(...)` helper.
+- Preserved existing per-robot subscribe flow:
+  - `subscribeToRobotTopics(robotId)` remains
+  - per-robot subscribe now skips when global telemetry wildcard coverage is active to avoid overlap.
+
+### Explicitly preserved
+- No frontend changes.
+- No Python vision module changes.
+- No request status transition/mapping logic changes.
+- Existing payload parsing and malformed/unrelated message guards unchanged.
+
+### Verification
+- Backend build passed with `npm run build`.
+
+### Current stopping point
+- Backend now receives `robot/robot_01/status` and `robot/robot_01/pose` immediately after startup for demo/testing, while keeping existing request/robot validation in handlers.
+
 ## Session Update (2026-05-28, LostItem multi-class YOLO model compatibility)
 
 ### Completed
