@@ -15,7 +15,7 @@ services:
       - goTogether-mqtt
     networks:
       - monorepo-network
-    command: sh -c "npm install && npm run build && npm run start:prod"
+    command: sh -c "npm install --include=dev && npm run build && npm run start:prod"
 
   goTogether-batch:
     container_name: goTogether-batch
@@ -32,7 +32,7 @@ services:
       - goTogether-mqtt
     networks:
       - monorepo-network
-    command: sh -c "npm install && npm run build:batch && npm run start:prod:batch"
+    command: sh -c "npm install --include=dev && npm run build:batch && npm run start:prod:batch"
 
   goTogether-mqtt:
     image: eclipse-mosquitto:2
