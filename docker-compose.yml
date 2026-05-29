@@ -8,10 +8,12 @@ services:
     volumes:
       - ./:/usr/src/goTogether
     working_dir: /usr/src/goTogether
-
+    env_file:
+      - .env
+    depends_on:
+      - goTogether-mqtt
     networks:
       - monorepo-network
-
     command: sh -c "npm install && npm run build && npm run start:prod"
 
   goTogether-batch:
@@ -23,11 +25,26 @@ services:
     volumes:
       - ./:/usr/src/goTogether
     working_dir: /usr/src/goTogether
-
+    env_file:
+      - .env
+    depends_on:
+      - goTogether-mqtt
     networks:
       - monorepo-network
-
     command: sh -c "npm install && npm run build:batch && npm run start:prod:batch"
+
+  goTogether-mqtt:
+    image: eclipse-mosquitto:2
+    container_name: goTogether-mqtt
+    restart: always
+    ports:
+      - 1883:1883
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    networks:
+      - monorepo-network
 
 networks:
   monorepo-network:
