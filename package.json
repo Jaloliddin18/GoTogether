@@ -1,5 +1,5 @@
 {
-	"name": "goTogether",
+	"name": "go-together",
 	"version": "0.0.1",
 	"description": "",
 	"author": "",
@@ -14,7 +14,7 @@
 		"start:dev:batch": "nest start goTogether-batch --watch",
 		"start:debug": "nest start --debug --watch",
 		"start:prod": "NODE_ENV=production node dist/apps/goTogether-api/main",
-		"start:prod:batch": "node dist/apps/goTogether-batch/main",
+		"start:prod:batch": "NODE_ENV=production node dist/apps/goTogether-batch/main",
 		"backfill:member-counters": "node -r ts-node/register -r tsconfig-paths/register apps/goTogether-api/src/scripts/backfill-member-counters.ts",
 		"lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
 		"test": "jest",
