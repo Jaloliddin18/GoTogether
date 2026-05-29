@@ -6,7 +6,7 @@ Live robot tracking should use a dedicated robot WebSocket gateway.
 Do not mix robot tracking with the existing general socket gateway.
 
 Expected gateway location:
-apps/nestar-api/src/socket/robot.gateway.ts
+apps/goTogether-api/src/socket/robot.gateway.ts
 
 ## Room model
 

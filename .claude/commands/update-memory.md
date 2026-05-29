@@ -4,10 +4,10 @@ Run these commands to gather accurate data:
 - git branch --show-current
 - git log --oneline -8
 - git status
-- ls apps/nestar-api/src/components/
-- ls apps/nestar-api/src/schemas/
-- ls apps/nestar-api/src/robot-comm/ (if it exists)
-- ls apps/nestar-api/src/socket/
+- ls apps/goTogether-api/src/components/
+- ls apps/goTogether-api/src/schemas/
+- ls apps/goTogether-api/src/robot-comm/ (if it exists)
+- ls apps/goTogether-api/src/socket/
 
 Then rewrite MEMORY.md with:
 - Last Updated: today's date + latest commit hash

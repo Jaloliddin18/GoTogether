@@ -10,14 +10,14 @@ layer — it does NOT control motors, run ROS 2, or do OCR. It talks to the robo
 
 ## Monorepo Structure
 ```
-apps/nestar-api/         ← main API app (your workspace)
+apps/goTogether-api/         ← main API app (your workspace)
   src/
     components/          ← domain modules: book, robot, request (and legacy: member, property)
     schemas/             ← Mongoose schemas
     socket/              ← WebSocket gateways (general + robot)
     robot-comm/          ← MQTT module (implemented)
     libs/dto/            ← shared DTOs and input types
-apps/nestar-batch/       ← batch jobs — DO NOT TOUCH unless explicitly asked
+apps/goTogether-batch/       ← batch jobs — DO NOT TOUCH unless explicitly asked
 uploads/                 ← runtime upload storage
 ```
 
@@ -109,7 +109,7 @@ robot/{robotId}/lost-item ← vision module PUBLISHES patrol lost-item events BA
 ```
 
 ### WebSocket Events (frontend will depend on these)
-Gateway file: `apps/nestar-api/src/socket/robot.gateway.ts`
+Gateway file: `apps/goTogether-api/src/socket/robot.gateway.ts`
 Room model: clients join room `request:{requestId}`
 - Adapter reality: this project uses plain `ws`, so request-scoped targeting is implemented via manual client-room mapping (not Socket.IO rooms).
 
@@ -144,7 +144,7 @@ Cancellation: `USER_CANCELLED → CANCELLED`
 - **Validate MQTT payloads** before trusting them — do not process garbage from robot
 - **MongoDB update before WebSocket emit** — always persist first, then notify frontend
 - **Do not mix robot gateway with existing general socket gateway**
-- **Do not touch** `apps/nestar-batch` unless explicitly asked
+- **Do not touch** `apps/goTogether-batch` unless explicitly asked
 - **Do not add** ROS, YOLO, OCR, or motor-control code in this repo
 - Run `npm run build` after every implementation step and fix errors before continuing
 
@@ -203,7 +203,7 @@ JWT_SECRET=
 ## Known Issues / Cleanup Backlog
 - Book image uploads still use `uploads/property` path — should be `uploads/book` (not urgent)
 - `Request.error` returns object with null fields on success — acceptable for now
-- `apps/nestar-batch` may still contain old property/agent logic — not handled yet
+- `apps/goTogether-batch` may still contain old property/agent logic — not handled yet
 
 ## Recent Backend Completion Notes
 - BookInventory pickup refactor is complete:
@@ -225,12 +225,12 @@ JWT_SECRET=
 
 ### Completed
 - Added LostItem backend foundation as a new module:
-  - `apps/nestar-api/src/components/lost-item/*`
-  - `apps/nestar-api/src/schemas/LostItem.model.ts`
-  - `apps/nestar-api/src/libs/dto/lost-item/*`
-  - `apps/nestar-api/src/libs/enums/lost-item.enum.ts`
+  - `apps/goTogether-api/src/components/lost-item/*`
+  - `apps/goTogether-api/src/schemas/LostItem.model.ts`
+  - `apps/goTogether-api/src/libs/dto/lost-item/*`
+  - `apps/goTogether-api/src/libs/enums/lost-item.enum.ts`
 - Registered `LostItemModule` in `ComponentsModule`.
-- Added `availableLostItemSorts` in `apps/nestar-api/src/libs/config.ts`.
+- Added `availableLostItemSorts` in `apps/goTogether-api/src/libs/config.ts`.
 - Added admin GraphQL APIs:
   - `getLostItems(input: LostItemsInquiry!): LostItems`
   - `updateLostItemStatus(input: UpdateLostItemStatusInput!): LostItem`

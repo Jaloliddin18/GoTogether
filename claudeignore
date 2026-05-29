@@ -11,15 +11,15 @@ build/
 .next/
 
 # ── Batch app (separate concern — do not read unless asked) ───────
-apps/nestar-batch/
+apps/goTogether-batch/
 
 # ── Legacy real-estate modules (being phased out — do not read) ───
 # These exist but are not part of Smart Library work.
 # Claude Code must not reference or modify these.
-apps/nestar-api/src/components/property/
-apps/nestar-api/src/components/agent/
-apps/nestar-api/src/schemas/Property.model.ts
-apps/nestar-api/src/schemas/Agent.model.ts
+apps/goTogether-api/src/components/property/
+apps/goTogether-api/src/components/agent/
+apps/goTogether-api/src/schemas/Property.model.ts
+apps/goTogether-api/src/schemas/Agent.model.ts
 
 # ── Runtime uploads (not code) ────────────────────────────────────
 uploads/

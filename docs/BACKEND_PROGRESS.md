@@ -43,9 +43,9 @@
 
 ### 3.3 Phase 4 complete (MQTT module)
 - Added:
-  - `apps/nestar-api/src/robot-comm/mqtt.types.ts`
-  - `apps/nestar-api/src/robot-comm/mqtt.service.ts`
-  - `apps/nestar-api/src/robot-comm/mqtt.module.ts`
+  - `apps/goTogether-api/src/robot-comm/mqtt.types.ts`
+  - `apps/goTogether-api/src/robot-comm/mqtt.service.ts`
+  - `apps/goTogether-api/src/robot-comm/mqtt.module.ts`
 - Registered `MqttRobotModule` in `AppModule`.
 - Added `mqtt` dependency.
 - `MQTT_BROKER_URL` controls broker connection.
@@ -58,7 +58,7 @@
 
 ### 3.4 Phase 5 complete (RobotGateway)
 - Added dedicated robot gateway:
-  - `apps/nestar-api/src/socket/robot.gateway.ts`
+  - `apps/goTogether-api/src/socket/robot.gateway.ts`
 - Registered `RobotGateway` in `SocketModule`.
 - Robot gateway is separated from existing chat/general `SocketGateway`.
 - Project WebSocket adapter is plain `ws` (not Socket.IO).
@@ -81,8 +81,8 @@
 
 ### 3.5 Phase 6 complete (MQTT telemetry integration)
 - Main files:
-  - `apps/nestar-api/src/robot-comm/mqtt.service.ts`
-  - `apps/nestar-api/src/robot-comm/mqtt.module.ts`
+  - `apps/goTogether-api/src/robot-comm/mqtt.service.ts`
+  - `apps/goTogether-api/src/robot-comm/mqtt.module.ts`
 - Pose telemetry updates:
   - `Robot.currentPose`
   - `Robot.lastSeenAt`
@@ -131,7 +131,7 @@
   - removed unused `Follow` model injection from Twit module/service after `getTwits` feed-filter removal
 - One-time DB maintenance executed:
   - added script:
-    - `apps/nestar-api/src/scripts/backfill-member-counters.ts`
+    - `apps/goTogether-api/src/scripts/backfill-member-counters.ts`
   - added npm command:
     - `npm run backfill:member-counters`
   - execution result on 2026-05-15:
@@ -144,10 +144,10 @@
 
 ### 3.7 LostItem Phase 1 foundation (2026-05-25)
 - Added LostItem enums and GraphQL registration:
-  - `apps/nestar-api/src/libs/enums/lost-item.enum.ts`
+  - `apps/goTogether-api/src/libs/enums/lost-item.enum.ts`
   - `LostItemObjectType`, `LostItemPriority`, `LostItemStatus`, `LostItemEventType`
 - Added LostItem schema:
-  - `apps/nestar-api/src/schemas/LostItem.model.ts`
+  - `apps/goTogether-api/src/schemas/LostItem.model.ts`
   - fields:
     - required: `robotId`, `eventType`, `objectType`, `confidence`, `priority`, `detectedAt`
     - optional: `snapshotPath`, `snapshotUrl`, `location.source`, `location.floorId`, `location.x`, `location.y`, `location.patrolCheckpoint`, `notes`
@@ -158,15 +158,15 @@
     - `robotId + detectedAt` desc
     - `objectType + priority + detectedAt` desc
 - Added LostItem DTO/input/update contracts:
-  - `apps/nestar-api/src/libs/dto/lost-item/lost-item.ts`
-  - `apps/nestar-api/src/libs/dto/lost-item/lost-item.input.ts`
-  - `apps/nestar-api/src/libs/dto/lost-item/lost-item.update.ts`
+  - `apps/goTogether-api/src/libs/dto/lost-item/lost-item.ts`
+  - `apps/goTogether-api/src/libs/dto/lost-item/lost-item.input.ts`
+  - `apps/goTogether-api/src/libs/dto/lost-item/lost-item.update.ts`
 - Added LostItem component layer:
-  - `apps/nestar-api/src/components/lost-item/lost-item.module.ts`
-  - `apps/nestar-api/src/components/lost-item/lost-item.resolver.ts`
-  - `apps/nestar-api/src/components/lost-item/lost-item.service.ts`
-- Registered `LostItemModule` in `apps/nestar-api/src/components/components.module.ts`.
-- Added `availableLostItemSorts` in `apps/nestar-api/src/libs/config.ts`.
+  - `apps/goTogether-api/src/components/lost-item/lost-item.module.ts`
+  - `apps/goTogether-api/src/components/lost-item/lost-item.resolver.ts`
+  - `apps/goTogether-api/src/components/lost-item/lost-item.service.ts`
+- Registered `LostItemModule` in `apps/goTogether-api/src/components/components.module.ts`.
+- Added `availableLostItemSorts` in `apps/goTogether-api/src/libs/config.ts`.
 - Added admin GraphQL API:
   - `getLostItems(input: LostItemsInquiry!): LostItems`
   - supports filters: `status`, `objectType`, `priority`, `robotId`, `detectedAtFrom`, `detectedAtTo`, pagination
@@ -178,7 +178,7 @@
 - Extended MQTT subscription scope for patrol detection events:
   - subscribed wildcard topic: `robot/+/lost-item`
   - preserves existing per-robot status/pose topic subscription behavior.
-- Extended MQTT topic parser in `apps/nestar-api/src/robot-comm/mqtt.service.ts`:
+- Extended MQTT topic parser in `apps/goTogether-api/src/robot-comm/mqtt.service.ts`:
   - supports `status`, `pose`, and `lost-item` topic types.
 - Added lost-item event ingestion flow:
   - safe JSON parsing and payload shape validation
@@ -193,7 +193,7 @@
 - Added internal create method for persistence:
   - `LostItemService.createLostItemFromPatrolEvent(...)`
 - Wired LostItem service into MQTT module:
-  - `apps/nestar-api/src/robot-comm/mqtt.module.ts` imports `LostItemModule`.
+  - `apps/goTogether-api/src/robot-comm/mqtt.module.ts` imports `LostItemModule`.
 - Current Phase 2 behavior:
   - valid lost-item events are persisted to MongoDB `lostItems`
   - malformed payloads are warned/dropped without crashing backend
@@ -202,14 +202,14 @@
 ### 3.9 LostItem Phase 3 snapshot upload API (2026-05-26)
 - Added lost-item-specific upload mutation:
   - `uploadLostItemSnapshot(file: Upload!): LostItemSnapshotUploadResult`
-  - location: `apps/nestar-api/src/components/lost-item/lost-item.resolver.ts`
+  - location: `apps/goTogether-api/src/components/lost-item/lost-item.resolver.ts`
   - guard: admin-only (`RolesGuard` + `MemberType.ADMIN`)
 - Added upload result DTO:
   - `LostItemSnapshotUploadResult { snapshotPath, snapshotUrl }`
-  - location: `apps/nestar-api/src/libs/dto/lost-item/lost-item.ts`
+  - location: `apps/goTogether-api/src/libs/dto/lost-item/lost-item.ts`
 - Added upload service implementation:
   - `LostItemService.uploadLostItemSnapshot(...)`
-  - location: `apps/nestar-api/src/components/lost-item/lost-item.service.ts`
+  - location: `apps/goTogether-api/src/components/lost-item/lost-item.service.ts`
   - fixed destination folder: `uploads/lost-items/`
   - auto-create directory if missing
   - MIME allowlist: `image/png`, `image/jpg`, `image/jpeg`

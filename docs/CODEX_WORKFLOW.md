@@ -82,7 +82,7 @@ For every non-trivial task:
 
 ## Migration strategy
 
-The goal is to transform the existing real-estate Nestar project into the 같이Go Smart Library Robot Delivery project.
+The goal is to transform the existing real-estate GoTogether project into the 같이Go Smart Library Robot Delivery project.
 
 ### 1) Keep useful infrastructure
 - NestJS/Next.js project structure

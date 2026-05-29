@@ -14,16 +14,16 @@ This repository is the backend for 같이Go, a Smart Library Robot Delivery syst
 - JWT auth
 - Existing roles: `USER`, `ADMIN`, `AGENT`
 - Existing socket gateway
-- Separate batch app (`apps/nestar-batch`)
+- Separate batch app (`apps/goTogether-batch`)
 - No frontend inside this backend repo
 - MQTT will be added later
 
 ## Main Folders
-- `apps/nestar-api`: main API application
-- `apps/nestar-batch`: batch/scheduled jobs application
-- `apps/nestar-api/src/components`: domain modules (resolver/service/module pattern)
-- `apps/nestar-api/src/schemas`: Mongoose schemas
-- `apps/nestar-api/src/socket`: WebSocket gateways
+- `apps/goTogether-api`: main API application
+- `apps/goTogether-batch`: batch/scheduled jobs application
+- `apps/goTogether-api/src/components`: domain modules (resolver/service/module pattern)
+- `apps/goTogether-api/src/schemas`: Mongoose schemas
+- `apps/goTogether-api/src/socket`: WebSocket gateways
 - `uploads`: runtime upload storage
 
 ## High-Level Smart Library Goal
@@ -48,24 +48,24 @@ Add Smart Library features incrementally while preserving existing backend behav
 - Backend communicates with robot through MQTT only; ROS 2 remains robot-side.
 - Backend build command is `npm run build`.
 - Keep Groq API access backend-only; do not expose `GROQ_API_KEY` to frontend code.
-- Chatbot module lives under `apps/nestar-api/src/components/chat/`.
+- Chatbot module lives under `apps/goTogether-api/src/components/chat/`.
 - Chatbot REST endpoint is `POST /chat/message`.
 - Chatbot response shape is `{ reply: string, books: ChatBookSuggestion[] }`.
 - Keep chatbot book answers grounded in live DB retrieval from the `Book` collection only when the current user message asks for book/catalog results.
 - Do not return fallback active books as UI suggestions for unrelated chat questions.
 - Do not reintroduce the old general `SocketGateway` for chatbot work.
-- Do not touch `apps/nestar-api/src/socket/robot.gateway.ts` for chatbot work.
+- Do not touch `apps/goTogether-api/src/socket/robot.gateway.ts` for chatbot work.
 
 ## Suggested Smart Library Locations
-- `apps/nestar-api/src/components/book/`
-- `apps/nestar-api/src/components/robot/`
-- `apps/nestar-api/src/components/request/`
-- `apps/nestar-api/src/robot-comm/`
-- `apps/nestar-api/src/socket/robot.gateway.ts`
-- `apps/nestar-api/src/schemas/Book.model.ts`
-- `apps/nestar-api/src/schemas/Robot.model.ts`
-- `apps/nestar-api/src/schemas/Request.model.ts`
-- `apps/nestar-api/src/schemas/RobotStatusLog.model.ts`
+- `apps/goTogether-api/src/components/book/`
+- `apps/goTogether-api/src/components/robot/`
+- `apps/goTogether-api/src/components/request/`
+- `apps/goTogether-api/src/robot-comm/`
+- `apps/goTogether-api/src/socket/robot.gateway.ts`
+- `apps/goTogether-api/src/schemas/Book.model.ts`
+- `apps/goTogether-api/src/schemas/Robot.model.ts`
+- `apps/goTogether-api/src/schemas/Request.model.ts`
+- `apps/goTogether-api/src/schemas/RobotStatusLog.model.ts`
 
 ## Safe Implementation Order
 1. Book schema/module/resolver/service
@@ -80,7 +80,7 @@ Add Smart Library features incrementally while preserving existing backend behav
 10. Staff dashboard operations
 
 ## Migration Principle
-The goal is to transform the existing real-estate Nestar project into the 같이Go Smart Library Robot Delivery project.
+The goal is to transform the existing real-estate GoTogether project into the 같이Go Smart Library Robot Delivery project.
 
 ### 1) Keep useful infrastructure
 - NestJS/Next.js project structure
@@ -125,7 +125,7 @@ When removing old real-estate code later, Codex must:
 ## Do Not Do Unless Explicitly Asked
 - Do not modify unrelated legacy modules.
 - Do not refactor the full project structure.
-- Do not change batch app behavior (`apps/nestar-batch`) unless requested.
+- Do not change batch app behavior (`apps/goTogether-batch`) unless requested.
 - Do not introduce frontend code in this repo.
 - Do not add non-MQTT robot transport layers.
 
@@ -188,11 +188,28 @@ If a bad commit was made and not pushed, suggest:
 
 ---
 
+## Session Update (2026-05-29) — Project-wide `goTogether` naming migration
+
+### Completed
+- Main app folder naming is now `apps/goTogether-api` and `apps/goTogether-batch`.
+- Dist output folder naming is now `dist/apps/goTogether-api` and `dist/apps/goTogether-batch`.
+- Repository-wide naming now follows `goTogether` conventions in paths, configs, scripts, and docs.
+- Updated path/config/script/docs references to align with new app names.
+
+### Verification
+- `npm run build` passed after rename migration.
+
+### Operational rule from this session
+- Do not introduce legacy naming in files, paths, app identifiers, container names, or scripts.
+- Use `goTogether` naming consistently for deployment-facing configuration.
+
+---
+
 ## Session Update (2026-05-27) — Dock completion telemetry now finalizes robot status
 
 ### Completed
 - Fixed post-delivery robot status finalization in:
-  - `apps/nestar-api/src/robot-comm/mqtt.service.ts`
+  - `apps/goTogether-api/src/robot-comm/mqtt.service.ts`
 - In MQTT status handling, completion-style telemetry states now finalize return lifecycle:
   - completion aliases handled: `COMPLETED`, `FINISHED`, `DELIVERY_COMPLETED`, `DELIVERY_COMPLETE`, `TASK_COMPLETED`, `TASK_COMPLETE`, `MISSION_COMPLETED`, `MISSION_COMPLETE`
   - if robot is currently `RETURNING` or `DOCKING`, backend now sets robot status to `IDLE` and clears `currentRequestId`.
@@ -211,22 +228,22 @@ If a bad commit was made and not pushed, suggest:
 
 ### Completed
 - Enforced `memberBooks` as an admin-only stored DB field:
-  - `apps/nestar-api/src/schemas/Member.model.ts`
+  - `apps/goTogether-api/src/schemas/Member.model.ts`
   - removed unconditional `memberBooks` default
   - added schema pre-save guard: keep numeric `memberBooks` for `ADMIN`, unset for non-admin.
 - Added service-level enforcement and response normalization:
-  - `apps/nestar-api/src/components/member/member.service.ts`
+  - `apps/goTogether-api/src/components/member/member.service.ts`
   - on member updates, non-admin docs now `$unset` `memberBooks`; admin docs ensure numeric `memberBooks`.
   - API responses normalize missing `memberBooks` to `0` to keep existing GraphQL consumers safe.
 - Hardened member lookups used by twit/follow/comment aggregations:
-  - `apps/nestar-api/src/libs/config.ts`
+  - `apps/goTogether-api/src/libs/config.ts`
   - `lookupMember`, `lookupFollowingData`, `lookupFollowerData` now include `$addFields.memberBooks: { $ifNull: [...] }`.
 - Updated backfill script for policy migration:
-  - `apps/nestar-api/src/scripts/backfill-member-counters.ts`
+  - `apps/goTogether-api/src/scripts/backfill-member-counters.ts`
   - general counters backfill keeps existing behavior
   - `memberBooks` now normalized only for admins and removed from non-admin docs.
 - Updated startup health check policy:
-  - `apps/nestar-api/src/components/member/member-health-check.service.ts`
+  - `apps/goTogether-api/src/components/member/member-health-check.service.ts`
   - validates `memberBooks` is numeric for admins and missing for non-admins.
 
 ### Verification
@@ -237,7 +254,7 @@ If a bad commit was made and not pushed, suggest:
 ## Session Update (2026-05-28) — Global MQTT telemetry topic subscription for demo tracking
 
 ### Completed
-- Updated `apps/nestar-api/src/robot-comm/mqtt.service.ts` startup MQTT wiring to subscribe global telemetry topics on every connect:
+- Updated `apps/goTogether-api/src/robot-comm/mqtt.service.ts` startup MQTT wiring to subscribe global telemetry topics on every connect:
   - `robot/+/status`
   - `robot/+/pose`
   - `robot/+/lost-item` (preserved)
@@ -263,7 +280,7 @@ If a bad commit was made and not pushed, suggest:
 
 ### Completed
 - Updated LostItem MQTT object-type normalization in:
-  - `apps/nestar-api/src/robot-comm/mqtt.service.ts`
+  - `apps/goTogether-api/src/robot-comm/mqtt.service.ts`
 - Added/confirmed compatibility mappings for new model labels:
   - `watch` / `WATCH` -> `WATCH`
   - `airpods` / `AIRPODS` -> `AIRPODS`
@@ -327,7 +344,7 @@ If a bad commit was made and not pushed, suggest:
 ## Session Update (2026-05-24) — Admin bookLikes sort validation
 
 ### Completed
-- Added `bookLikes` to `availableBookSorts` in `apps/nestar-api/src/libs/config.ts`.
+- Added `bookLikes` to `availableBookSorts` in `apps/goTogether-api/src/libs/config.ts`.
 - This allows admin `GET_ALL_BOOKS_BY_ADMIN` queries to sort by `bookLikes`, required by the frontend admin dashboard `Top Liked Books` ranked list.
 
 ### Verification
@@ -342,12 +359,12 @@ If a bad commit was made and not pushed, suggest:
 
 ### Completed
 - Added LostItem enum layer with GraphQL registration:
-  - `apps/nestar-api/src/libs/enums/lost-item.enum.ts`
+  - `apps/goTogether-api/src/libs/enums/lost-item.enum.ts`
   - `LostItemObjectType`: `ID_CARD`, `BOTTLE`, `WALLET`, `PHONE`, `BOOK`, `UNKNOWN`
   - `LostItemPriority`: `HIGH`, `MEDIUM`, `LOW`
   - `LostItemStatus`: `PENDING_REVIEW`, `COLLECTED`, `DISMISSED`
 - Added LostItem schema:
-  - `apps/nestar-api/src/schemas/LostItem.model.ts`
+  - `apps/goTogether-api/src/schemas/LostItem.model.ts`
   - required fields: `robotId`, `eventType`, `objectType`, `confidence`, `priority`, `detectedAt`
   - optional fields: `snapshotPath`, `snapshotUrl`, `location.*`, `notes`
   - default status: `PENDING_REVIEW`
@@ -357,15 +374,15 @@ If a bad commit was made and not pushed, suggest:
     - `{ robotId: 1, detectedAt: -1 }`
     - `{ objectType: 1, priority: 1, detectedAt: -1 }`
 - Added LostItem DTO and input/update contracts:
-  - `apps/nestar-api/src/libs/dto/lost-item/lost-item.ts`
-  - `apps/nestar-api/src/libs/dto/lost-item/lost-item.input.ts`
-  - `apps/nestar-api/src/libs/dto/lost-item/lost-item.update.ts`
+  - `apps/goTogether-api/src/libs/dto/lost-item/lost-item.ts`
+  - `apps/goTogether-api/src/libs/dto/lost-item/lost-item.input.ts`
+  - `apps/goTogether-api/src/libs/dto/lost-item/lost-item.update.ts`
 - Added LostItem component module/resolver/service:
-  - `apps/nestar-api/src/components/lost-item/lost-item.module.ts`
-  - `apps/nestar-api/src/components/lost-item/lost-item.resolver.ts`
-  - `apps/nestar-api/src/components/lost-item/lost-item.service.ts`
-- Registered `LostItemModule` in `apps/nestar-api/src/components/components.module.ts`.
-- Added LostItem sort whitelist in `apps/nestar-api/src/libs/config.ts`:
+  - `apps/goTogether-api/src/components/lost-item/lost-item.module.ts`
+  - `apps/goTogether-api/src/components/lost-item/lost-item.resolver.ts`
+  - `apps/goTogether-api/src/components/lost-item/lost-item.service.ts`
+- Registered `LostItemModule` in `apps/goTogether-api/src/components/components.module.ts`.
+- Added LostItem sort whitelist in `apps/goTogether-api/src/libs/config.ts`:
   - `availableLostItemSorts` with default use on `detectedAt DESC`.
 
 ### API Added (admin-only)
@@ -427,15 +444,15 @@ If a bad commit was made and not pushed, suggest:
 ### Completed
 - Added lost-item-specific GraphQL upload mutation:
   - `uploadLostItemSnapshot(file: Upload!): LostItemSnapshotUploadResult`
-  - file: `apps/nestar-api/src/components/lost-item/lost-item.resolver.ts`
+  - file: `apps/goTogether-api/src/components/lost-item/lost-item.resolver.ts`
   - guard: `@Roles(MemberType.ADMIN)` + `@UseGuards(RolesGuard)`
 - Added upload result DTO:
   - `LostItemSnapshotUploadResult`
   - fields: `snapshotPath`, `snapshotUrl`
-  - file: `apps/nestar-api/src/libs/dto/lost-item/lost-item.ts`
+  - file: `apps/goTogether-api/src/libs/dto/lost-item/lost-item.ts`
 - Added scoped upload service logic:
   - method: `LostItemService.uploadLostItemSnapshot(...)`
-  - file: `apps/nestar-api/src/components/lost-item/lost-item.service.ts`
+  - file: `apps/goTogether-api/src/components/lost-item/lost-item.service.ts`
   - upload target is fixed to `uploads/lost-items/` only
   - directory auto-create uses `mkdirSync(..., { recursive: true })`
   - allowed MIME: `image/png`, `image/jpg`, `image/jpeg`
@@ -463,12 +480,12 @@ If a bad commit was made and not pushed, suggest:
 
 ### Completed
 - Hardened request-status lifecycle to prevent duplicate `READY` timeline entries and stale post-`READY` regressions.
-- Updated MQTT status telemetry handling in `apps/nestar-api/src/robot-comm/mqtt.service.ts`:
+- Updated MQTT status telemetry handling in `apps/goTogether-api/src/robot-comm/mqtt.service.ts`:
   - added semantic `hasReachedReady(...)` guard (checks status and timeline history, not only current status)
   - ignores duplicate `READY` telemetry after READY already exists in timeline
   - ignores stale non-terminal movement statuses after READY (e.g. `ARRIVED_AT_STUDENT`, `DELIVERING`, `NAVIGATING_TO_SHELF`)
   - moved request status write into guarded atomic update path to reduce out-of-order race regressions.
-- Updated admin/manual status mutation path in `apps/nestar-api/src/components/request/request.service.ts`:
+- Updated admin/manual status mutation path in `apps/goTogether-api/src/components/request/request.service.ts`:
   - ignores duplicate `READY` updates
   - ignores stale movement-status updates after READY
   - preserves existing terminal guards (`COMPLETED`, `FAILED`, `CANCELLED`) unchanged.
