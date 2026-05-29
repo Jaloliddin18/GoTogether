@@ -17,6 +17,7 @@ import { MqttRobotModule } from './robot-comm/mqtt.module';
 		GraphQLModule.forRoot({
 			driver: ApolloDriver,
 			playground: true,
+			csrfPrevention: false,
 			uploads: false,
 			autoSchemaFile: true,
 			formatError: (error: T) => {
