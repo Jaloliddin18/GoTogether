@@ -5,6 +5,7 @@ services:
     image: node:20.19.5
     ports:
       - 4003:3007
+      - 3009:3009
     volumes:
       - ./:/usr/src/goTogether
     working_dir: /usr/src/goTogether
